@@ -1,0 +1,39 @@
+[project]
+name = "festival-planner"
+version = "0.1.0"
+description = "Self-hosted, mobile-first planning tracker for two event co-organizers."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography",
+    "flask",
+    "gunicorn",
+    "pyjwt",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.uv]
+# An application, not a distributable package: run it from the checkout.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "scripts"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Plan and design docs are reference text; ruff would reformat the code samples in them.
+extend-exclude = ["docs", ".queue"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]

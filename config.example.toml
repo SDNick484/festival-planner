@@ -1,0 +1,54 @@
+# Festival Planner instance settings (non-secret). Copy to config.toml, which is gitignored.
+# Secrets (tokens, passwords, Cloudflare Access values) go in the environment: see .env.example.
+# All values below are fictional placeholders.
+
+[event]
+name = "Example Fall Festival"
+date = 2099-10-10          # local date of the event
+timezone = "UTC"           # IANA name, e.g. "Europe/Berlin"; "today" is computed in this zone
+data_dir = "data"          # SQLite database and other runtime files
+
+# Exactly the people who may log in. Aliases are other addresses each person sends or forwards
+# from; they are used to recognise senders, never for login.
+[[organizers]]
+email = "organizer-a@example.com"
+display_name = "Organizer A"
+aliases = []
+
+[[organizers]]
+email = "organizer-b@example.com"
+display_name = "Organizer B"
+aliases = ["organizer-b@example.org"]
+
+# Created on first start; editable in the UI afterwards.
+[seed]
+workstreams = [
+  "Rentals & Rides",
+  "Vendors",
+  "Silent Auction",
+  "Volunteers",
+  "Sponsorships",
+  "Marketing",
+  "Budget",
+]
+# Milestones as days before the event (T-60 is 60 days before).
+milestone_days_before = [60, 45, 30, 21, 14, 7, 1]
+
+[needs_attention]
+waiting_stale_days = 5     # a task waiting longer than this needs attention
+
+[email]
+# Capture mailbox (read-only IMAP) and outgoing digest. Omit imap_host to turn capture off.
+imap_host = "imap.example.com"
+imap_user = "planner@example.com"
+imap_label = "Festival"
+poll_seconds = 300
+retention_days = 30
+smtp_host = "smtp.example.com"
+smtp_port = 587
+
+[digest]
+# Weekly digest email; leave weekday out to turn it off. 0 = Monday ... 6 = Sunday.
+weekday = 0
+hour = 8                   # hour of day in the event timezone
+final_stretch = false      # twice weekly in the last 14 days
