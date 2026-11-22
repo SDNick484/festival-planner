@@ -1,0 +1,12 @@
+# Instance-specific and secret files: never commit
+.env
+config.toml
+data/
+deploy/local/
+.leak-denylist
+
+# Tooling
+.superpowers/
+.venv/
+__pycache__/
+*.pyc
