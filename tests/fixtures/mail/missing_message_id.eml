@@ -1,0 +1,9 @@
+Date: Sun, 12 Jan 2098 15:00:00 +0000
+From: organizer-b@example.com
+To: organizer-a@example.com
+Subject: No id on this one
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+This message has no Message-ID header.

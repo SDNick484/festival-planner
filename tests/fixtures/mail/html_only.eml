@@ -1,0 +1,17 @@
+Message-ID: <html-001@example.com>
+Date: Tue, 07 Jan 2098 10:00:00 +0000
+From: Example Tent Co. <quotes@example.net>
+To: organizer-a@example.com
+Subject: Updated quote
+MIME-Version: 1.0
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+<html><head><title>Ignore me</title>
+<style>p { color: red; }</style>
+<script>var secret = "do not show";</script></head>
+<body><p>Hello <b>team</b>,</p>
+<p>The new price is attached below &amp; valid for 7 days.</p>
+<div>Line one<br>Line two</div>
+<ul><li>Tables</li><li>Chairs</li></ul>
+</body></html>
