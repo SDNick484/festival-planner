@@ -17,8 +17,9 @@ from festival_planner.api._common import (
     organizer_emails,
     page_args,
 )
+from festival_planner.api.inbox import summarize
 from festival_planner.db import get_db
-from festival_planner.service import tasks
+from festival_planner.service import emails, tasks
 
 
 def _one(row: dict) -> dict:
@@ -51,7 +52,9 @@ def register(router: Router) -> None:
 
     @router.route(f"/tasks/{ID}", "GET")
     def get_task(id: int):
-        return jsonify(_one(tasks.get(get_db(), id)))
+        row = _one(tasks.get(get_db(), id))
+        row["emails"] = [summarize(e) for e in emails.list_for_task(get_db(), id)]
+        return jsonify(row)
 
     @router.route(f"/tasks/{ID}", "PATCH")
     def update_task(id: int):

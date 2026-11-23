@@ -338,7 +338,7 @@ def test_api_rejects_unknown_and_bad_types(api):
     assert api.get("/api/tasks/abc").json == {"error": "not found", "fields": {}}
     assert api.get("/api/nothing-here").status_code == 404
     # nothing above changed the task or created anything
-    assert api.get(f"/api/tasks/{tid}").json == t
+    assert api.get(f"/api/tasks/{tid}").json == {**t, "emails": []}  # GET adds the filed emails
     assert len(api.get("/api/tasks").json) == 1
 
 

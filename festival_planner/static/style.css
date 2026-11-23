@@ -891,3 +891,177 @@ textarea {
 .board-status {
   width: 100%;
 }
+
+/* --- #16 Inbox --- */
+.view-inbox [hidden] {
+  display: none !important;
+}
+
+.view-inbox {
+  max-width: 720px;
+}
+
+.inbox-status {
+  margin: 0 0 var(--gutter);
+}
+
+.inbox-status:empty {
+  display: none;
+}
+
+.inbox-status:focus {
+  outline: none;
+}
+
+.inbox-list,
+.email-list,
+.attachments,
+.picker-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inbox-card,
+.email-item {
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.inbox-card + .inbox-card,
+.email-item + .email-item {
+  margin-top: 12px;
+}
+
+.inbox-subject,
+.email-subject {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.email-meta {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+}
+
+/* The organizer's one-line note: set apart from the email, in the accent colour. */
+.forward-note {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.forward-note-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.forward-note-text {
+  margin: 2px 0 0;
+  font-weight: 600;
+  white-space: pre-line;
+}
+
+.inbox-preview {
+  margin: 0 0 8px;
+  white-space: pre-line;
+}
+
+.attachment {
+  display: inline-block;
+  margin: 0 6px 6px 0;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.875rem;
+}
+
+.suggest-chip {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 2px 10px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-radius: 999px;
+  font-size: 0.875rem;
+}
+
+.inbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inbox-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.email-body {
+  margin: 8px 0 0;
+  max-height: 24rem;
+  overflow: auto;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.email-viewer {
+  margin: 8px 0;
+}
+
+.inbox-card .email-viewer {
+  margin-top: 0;
+}
+
+.picker-results li {
+  margin-top: 6px;
+}
+
+.picker-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.picker-meta {
+  font-size: 0.8rem;
+}
+
+.view-inbox input,
+.view-inbox select,
+.view-inbox button {
+  min-height: 44px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.view-inbox input,
+.view-inbox select {
+  width: 100%;
+  min-width: 0;
+}
+
+.view-inbox .inbox-panel label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
