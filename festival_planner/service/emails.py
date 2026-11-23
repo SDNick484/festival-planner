@@ -241,6 +241,12 @@ def list_inbox(con: sqlite3.Connection) -> list[dict]:
     return [_decode(r) for r in rows.fetchall()]
 
 
+def list_for_task(con: sqlite3.Connection, task_id: int) -> list[dict]:
+    """Emails filed to this task, oldest capture first."""
+    rows = con.execute("SELECT * FROM email_item WHERE task_id = ? ORDER BY id", (task_id,))
+    return [_decode(r) for r in rows.fetchall()]
+
+
 def inbox_count(con: sqlite3.Connection) -> int:
     return con.execute("SELECT COUNT(*) FROM email_item WHERE state = 'inbox'").fetchone()[0]
 
