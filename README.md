@@ -30,6 +30,9 @@ are gitignored; `.env.example` lists the secrets that belong in the environment.
 Access. See [`docs/deploy.md`](docs/deploy.md) for the full guide (Tunnel, Access bypass for
 `/mcp/*` and `/healthz`, Gmail capture, backups with `scripts/backup.sh`, upgrades).
 
+To run it natively on Alpine Linux instead (OpenRC services, no Docker), see
+[Alpine (native, no Docker)](docs/deploy.md#alpine-native-no-docker) and `deploy/alpine/`.
+
 ## Claude and Duet
 
 The app serves an MCP endpoint at `/mcp` (JSON-RPC over HTTP POST, no sessions). It is reached with

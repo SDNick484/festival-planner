@@ -1,0 +1,47 @@
+#!/sbin/openrc-run
+# Festival Planner worker: polls the capture mailbox and runs the daily jobs, supervised.
+# Install as /etc/init.d/festival-planner-worker (install.sh does this). Run exactly one worker.
+# It serves no port: monitor last_email_poll in the web service's /healthz instead.
+
+description="Festival Planner worker"
+
+# See festival-planner-web: the shared conf.d file, exported to the supervised process.
+FP_CONF="${FP_CONF:-/etc/conf.d/festival-planner}"
+if [ -r "$FP_CONF" ]; then
+	set -a
+	# shellcheck disable=SC1090
+	. "$FP_CONF"
+	set +a
+fi
+FP_ROOT="${FP_ROOT:-/opt/festival-planner}"
+
+supervisor="supervise-daemon"
+command="${FP_ROOT}/.venv/bin/python"
+command_args="-m festival_planner.worker"
+command_user="festival:festival"
+directory="${FP_ROOT}"
+output_log="/var/log/festival-planner/worker.log"
+error_log="/var/log/festival-planner/worker.log"
+respawn_delay=5
+respawn_max=0
+# The worker exits 0 on SIGTERM, which is what supervise-daemon sends on stop.
+export PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+
+depend() {
+	need net
+	# Start order only: the web service applies migrations and first-run seeding.
+	after festival-planner-web
+	use logger
+}
+
+start_pre() {
+	if [ ! -r "$FP_CONF" ]; then
+		eerror "$FP_CONF is missing: copy deploy/alpine/festival-planner.confd there (mode 600)"
+		return 1
+	fi
+	if [ ! -x "$command" ]; then
+		eerror "$command not found: run deploy/alpine/install.sh first"
+		return 1
+	fi
+	checkpath --directory --owner festival:festival --mode 0750 /var/log/festival-planner
+}

@@ -1,0 +1,35 @@
+# /etc/conf.d/festival-planner: secrets and environment for the festival-planner-web and
+# festival-planner-worker OpenRC services. Both services read this one file.
+#
+# install.sh copies this example to /etc/conf.d/festival-planner only when that file does not
+# exist yet, as root:root with mode 600. Keep it that way: it holds secrets. Edit the values below.
+# It is read by /bin/sh, so quote every value with single quotes; do not put spaces around "=".
+# All values here are fictional placeholders (the same variables as .env.example).
+
+# Where the app lives (the checkout that install.sh ran from). Uncomment if it is not here.
+#FP_ROOT='/opt/festival-planner'
+
+# The instance settings file (non-secret): see config.example.toml.
+FP_CONFIG='/etc/festival-planner/config.toml'
+
+# Where the web service listens. Loopback by default: cloudflared runs on this same host.
+# Only change it to a LAN address if the tunnel connector runs on another machine, and then keep
+# the port closed to everything but that machine.
+#FP_WEB_BIND='127.0.0.1:8000'
+
+# Cloudflare Access: the team domain and the application audience (AUD) tag.
+CF_TEAM_DOMAIN='example-team.example.com'
+CF_AUD='replace-with-the-access-application-aud-tag'
+
+# Machine tokens for the MCP endpoint: name:scope:secret, comma separated.
+# name: lowercase letters, digits, - or _ (not web, email or system). scope: read or write.
+# secret: at least 24 characters, no spaces or slashes, and unique across entries.
+MCP_TOKENS='claude:write:replace-with-a-long-random-secret,duet:read:replace-with-another-long-secret'
+
+# Mailbox and SMTP passwords (app passwords). Host and user live in config.toml.
+IMAP_PASSWORD='replace-with-an-app-password'
+SMTP_PASSWORD='replace-with-an-app-password'
+
+# Never set these in production (local development only; the app refuses DEV_AUTH_EMAIL otherwise):
+#FLASK_ENV='development'
+#DEV_AUTH_EMAIL='organizer-a@example.com'
