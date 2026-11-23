@@ -47,7 +47,18 @@ def test_no_console_errors_or_csp_violations(page, base_url):
     response = page.goto(base_url + "/")
     csp = response.headers["content-security-policy"]
     assert "unsafe-inline" not in csp and "script-src 'self'" in csp
+    # The task screen is real now: it asks the API for its task, and a missing one is a 404 that
+    # the browser logs as a console error. Visit a task that exists.
+    task_id = page.evaluate(
+        """async () => {
+          const api = await import("/static/api.js");
+          const [ws] = await api.get("/api/workstreams");
+          const body = {title: "Example route task", workstream_id: ws.id};
+          return (await api.post("/api/tasks", body)).id;
+        }"""
+    )
     for hash_, view in ROUTES:
+        hash_ = hash_.replace("#/task/1", f"#/task/{task_id}")
         # Only a hash changes after the first goto, so the old screen is still on the page until
         # the router swaps it: wait for the expected view, not for any view.
         page.goto(base_url + "/" + hash_)
