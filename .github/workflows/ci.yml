@@ -57,3 +57,36 @@ jobs:
           ./gitleaks version
       - name: Scan full history
         run: ./gitleaks git --redact --no-banner --verbose .
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: docker build -t festival-planner:ci .
+      - name: Run it with the example config and check /healthz
+        run: |
+          set -eu
+          cp config.example.toml "$RUNNER_TEMP/config.toml"
+          # DEV_AUTH_EMAIL and FLASK_ENV are deliberately unset: this is the production path.
+          docker run -d --name fp -p 8000:8000 \
+            -v "$RUNNER_TEMP/config.toml:/app/config.toml:ro" festival-planner:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/healthz; then echo; exit 0; fi
+            sleep 1
+          done
+          docker logs fp
+          exit 1
+      - name: Container runs as a non-root user and reports healthy
+        run: |
+          set -eu
+          test "$(docker exec fp id -u)" = "10001"
+          for _ in $(seq 1 45); do
+            status=$(docker inspect --format '{{ .State.Health.Status }}' fp)
+            [ "$status" = healthy ] && exit 0
+            sleep 2
+          done
+          docker logs fp
+          exit 1

@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+.queue
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+.env
+config.toml
+data
+deploy/local
+.leak-denylist
+tests
+docs
