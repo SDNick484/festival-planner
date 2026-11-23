@@ -32,10 +32,15 @@ def asset_version(static_dir: Path = STATIC_DIR) -> str:
     return digest.hexdigest()[:VERSION_LENGTH]
 
 
+def render_html(static_dir: Path, name: str, version: str) -> str:
+    """The page `name` with `?v=<version>` on every `/static/` URL it references."""
+    html = (static_dir / name).read_text(encoding="utf-8")
+    return _ASSET_RE.sub(lambda m: f'{m.group(1)}?v={version}"', html)
+
+
 def render_index(static_dir: Path, version: str) -> str:
     """index.html with `?v=<version>` on every `/static/` URL it references."""
-    html = (static_dir / "index.html").read_text(encoding="utf-8")
-    return _ASSET_RE.sub(lambda m: f'{m.group(1)}?v={version}"', html)
+    return render_html(static_dir, "index.html", version)
 
 
 def shell_files(static_dir: Path = STATIC_DIR) -> list[str]:

@@ -456,6 +456,112 @@ async function contactsSection() {
   });
 }
 
+// --- share links (#24) ---------------------------------------------------------------------
+
+// A link's raw token comes back once, from the create call. It is shown in this section's next
+// draw only, then forgotten: listing links never returns it.
+let freshLink = null;
+
+const SHARE_STATE = { active: "Active", expired: "Expired", revoked: "Revoked" };
+
+function shareRow(link, workstreams, redraw) {
+  const scope = link.workstream_id === null ? "All workstreams" : (workstreams.find((ws) => ws.id === link.workstream_id)?.name ?? "Deleted workstream");
+  const slot = h("span", { class: "mg-delete" });
+  const form = h(
+    "form",
+    { class: "mg-form mg-row", "data-item": "share-link", "data-id": link.id, "data-name": link.label, "data-state": link.state, novalidate: true },
+    h("p", { class: "mg-wide" }, h("span", { class: "mg-summary-name wrap" }, link.label)),
+    h("p", { class: "muted mg-derived wrap" }, `${scope} · ${SHARE_STATE[link.state] ?? link.state} · ${link.state === "revoked" ? "turned off" : `expires ${link.expires_at.slice(0, 10)}`}`),
+    h("div", { class: "mg-actions" }, slot, statusLine()),
+  );
+  const idle = () => mount(slot, link.state === "revoked" ? null : button("Revoke", { class: "mg-btn mg-danger-quiet" }, () => ask()));
+  const ask = () =>
+    mount(
+      slot,
+      h(
+        "span",
+        { class: "mg-confirm", role: "group", "data-confirm": "" },
+        h("span", { class: "mg-confirm-text wrap" }, `Revoke "${link.label}"? The link stops working at once.`),
+        button("Confirm revoke", { class: "mg-btn mg-danger" }, async () => {
+          const done = await submit(form, () => api.post(`/api/share-links/${link.id}/revoke`));
+          if (done) await redraw();
+          else idle();
+        }),
+        button("Cancel", {}, () => idle()),
+      ),
+    );
+  idle();
+  return form;
+}
+
+function freshLinkBox(link) {
+  const url = new URL(link.url, location.origin).href;
+  const input = h("input", { type: "text", class: "sh-token", value: url, readonly: true, "aria-label": `Share link for ${link.label}`, "data-share-url": "" });
+  const status = h("span", { class: "mg-message", role: "status", "data-state": "idle" });
+  const copy = button("Copy link", { class: "mg-btn mg-primary" }, async () => {
+    input.select();
+    try {
+      await navigator.clipboard.writeText(url);
+      status.dataset.state = "ok";
+      status.textContent = "Copied";
+    } catch {
+      status.dataset.state = "idle";
+      status.textContent = "Selected: copy it with your device's copy command.";
+    }
+  });
+  return h(
+    "div",
+    { class: "mg-form sh-links", "data-share-new": "" },
+    h("p", { class: "mg-wide" }, `New link for "${link.label}". Copy it now: it is shown only once.`),
+    h("div", { class: "mg-wide" }, input),
+    h("div", { class: "mg-actions" }, copy, status),
+  );
+}
+
+async function shareLinksSection() {
+  return built("share", "Share links", async (refresh) => {
+    const [list, workstreams] = await Promise.all([api.get("/api/share-links"), fetchAll("/api/workstreams")]);
+    const fresh = freshLink;
+    freshLink = null;
+    const label = control("input", "label", { type: "text", required: true, maxlength: 200, autocomplete: "off", placeholder: "Setup volunteers" });
+    const scope = control(
+      "select",
+      "workstream_id",
+      {},
+      h("option", { value: NO_WORKSTREAM }, "All workstreams"),
+      workstreams.filter((ws) => !ws.archived).map((ws) => h("option", { value: ws.id }, ws.name)),
+    );
+    const days = control("input", "days", { type: "number", value: 30, min: 1, max: 365, step: 1, inputmode: "numeric" });
+    const add = h(
+      "form",
+      { class: "mg-form mg-add", "data-form": "add-share-link", novalidate: true },
+      field("Label", "label", label, true),
+      field("Shows", "workstream_id", scope),
+      field("Days valid", "days", days),
+      h("div", { class: "mg-actions" }, h("button", { type: "submit", class: "mg-btn mg-primary" }, "Create link"), statusLine()),
+    );
+    add.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const result = await submit(add, () =>
+        api.post("/api/share-links", {
+          label: label.value.trim(),
+          workstream_id: scope.value === NO_WORKSTREAM ? null : Number(scope.value),
+          days: integer(days.value),
+        }),
+      );
+      if (!result) return;
+      freshLink = result;
+      await refresh();
+    });
+    return [
+      h("p", { class: "muted" }, "A share link shows volunteers task titles, statuses, due dates and owners, and milestone dates. Never notes, links, contacts or email."),
+      fresh ? freshLinkBox(fresh) : null,
+      list.length ? h("ul", { class: "mg-list" }, list.map((link) => h("li", null, shareRow(link, workstreams, refresh)))) : h("p", { class: "muted" }, "No share links yet."),
+      add,
+    ];
+  });
+}
+
 // --- the screen ----------------------------------------------------------------------------
 
 // One builder per section, one per line, in the order they appear. Each builder returns its
@@ -466,6 +572,7 @@ const SECTIONS = [
   workstreamsSection,
   milestonesSection,
   contactsSection,
+  shareLinksSection,
   // --- add new sections above this line (#24 Share links, #25 Export) ---
 ];
 

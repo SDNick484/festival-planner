@@ -2,6 +2,9 @@
 
 `test_route_scopes` walks the real app's URL map, so any route a later task adds without
 `@requires(...)`, or with the wrong kind for its path, fails here.
+
+`/s/*` (volunteer share links, Task 24) is the one prefix reached without Access or a machine
+token: its routes must be `@requires("share")`, and the "share" kind is allowed nowhere else.
 """
 
 from __future__ import annotations
@@ -11,6 +14,8 @@ from flask import Flask
 
 from festival_planner.auth import is_public_rule, requires
 from festival_planner.web import create_app
+
+SHARE_PREFIX = "/s/"
 
 
 def scope_violations(app: Flask) -> list[str]:
@@ -22,6 +27,11 @@ def scope_violations(app: Flask) -> list[str]:
         kind = getattr(app.view_functions[rule.endpoint], "_fp_auth", None)
         if kind is None:
             problems.append(f"{path} ({rule.endpoint}): no @requires")
+        elif path.startswith(SHARE_PREFIX):
+            if kind != "share":
+                problems.append(f"{path} ({rule.endpoint}): /s/* needs 'share', has {kind!r}")
+        elif kind == "share":
+            problems.append(f"{path} ({rule.endpoint}): 'share' outside /s/*")
         elif path == "/api" or path.startswith("/api/"):
             if kind != "web":
                 problems.append(f"{path} ({rule.endpoint}): /api needs 'web', has {kind!r}")
@@ -37,6 +47,7 @@ def test_route_scopes(tmp_path):
     app = create_app(make_config(tmp_path))
     rules = [r.rule for r in app.url_map.iter_rules()]
     assert "/healthz" in rules
+    assert [r for r in rules if r.startswith(SHARE_PREFIX)] == ["/s/redacted", "/s/redacted/data"]
     assert scope_violations(app) == []
 
 
@@ -53,9 +64,26 @@ def test_route_scope_check_catches_violations(tmp_path):
     app.add_url_rule("/mcp/jwt", "mcp_jwt", requires("web")(view))
     app.add_url_rule("/other", "other_token", requires("read")(view))
     app.add_url_rule("/static-ish", "static_ish", view)
+    app.add_url_rule("/s/ok", "share_ok", requires("share")(view))
+    app.add_url_rule("/s/web", "share_web", requires("web")(view))
+    app.add_url_rule("/s/missing", "share_missing", view)
+    app.add_url_rule("/api/share", "api_share", requires("share")(view))
+    app.add_url_rule("/mcp/share", "mcp_share", requires("share")(view))
+    app.add_url_rule("/elsewhere", "share_elsewhere", requires("share")(view))
     found = scope_violations(app)
-    assert len(found) == 5, found
-    for path in ("/api/missing", "/api/token", "/mcp/jwt", "/other", "/static-ish"):
+    assert len(found) == 10, found
+    for path in (
+        "/api/missing",
+        "/api/token",
+        "/mcp/jwt",
+        "/other",
+        "/static-ish",
+        "/s/web",
+        "/s/missing",
+        "/api/share",
+        "/mcp/share",
+        "/elsewhere",
+    ):
         assert any(f.startswith(path + " ") for f in found), path
 
 

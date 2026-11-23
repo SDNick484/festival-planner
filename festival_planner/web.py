@@ -7,6 +7,7 @@ from flask import Flask, Response, jsonify
 
 from festival_planner import auth, db, seed
 from festival_planner.api import register_api
+from festival_planner.api.share import ShareTokenMiddleware, register_share_pages
 from festival_planner.mcp import PathTokenMiddleware, register_mcp
 from festival_planner.service import emails
 from festival_planner.ui import register_ui
@@ -41,7 +42,12 @@ def create_app(config: Config | None = None) -> Flask:
 
     @app.after_request
     def security_headers(response: Response) -> Response:
-        response.headers.update(SECURITY_HEADERS)
+        for name, value in SECURITY_HEADERS.items():
+            if name == "Referrer-Policy":
+                # A route may set a stricter policy (share links send no-referrer).
+                response.headers.setdefault(name, value)
+            else:
+                response.headers[name] = value
         return response
 
     @app.get("/healthz")
@@ -54,10 +60,13 @@ def create_app(config: Config | None = None) -> Flask:
 
     register_api(app)
     register_ui(app)
+    # Volunteer share links (Task 24): public, read-only, outside /api and /mcp.
+    register_share_pages(app)
     # Machine clients (design §4.3): the MCP endpoint and the token-authenticated REST mirror.
     # The middleware strips a /mcp/<secret> path token before Flask or gunicorn logs the path.
     register_mcp(app)
     register_api(app, "/mcp/api", "token")
-    app.wsgi_app = PathTokenMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+    # The share-link middleware does the same for /s/<token>.
+    app.wsgi_app = ShareTokenMiddleware(PathTokenMiddleware(app.wsgi_app))  # type: ignore[method-assign]
 
     return app
