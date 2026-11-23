@@ -63,6 +63,11 @@ def open_home_online(page, base_url):
 
 def test_shell_loads_offline(page, context, base_url):
     open_home_online(page, base_url)
+    # Visit the Workstreams list once online, so its lists are stored ("last saved").
+    page.get_by_role("link", name="Workstreams").click()
+    expect(page.locator("#view h1")).to_have_text("Workstreams")
+    page.get_by_role("link", name="Home").click()
+    expect(page.locator("#view [data-view='home']")).to_have_count(1)
     paths = page.evaluate(CACHED_PATHS)
     assert {"/", "/static/app.js", "/static/style.css", "/manifest.webmanifest"} <= set(paths)
 
@@ -72,10 +77,11 @@ def test_shell_loads_offline(page, context, base_url):
     expect(page.get_by_role("navigation", name="Primary")).to_be_visible()
     expect(page.locator("#view [data-view='home']")).to_have_count(1)
 
-    # The router and the other screens work from the cached shell too.
-    page.get_by_role("link", name="Inbox").click()
-    expect(page.locator("#view [data-view='inbox']")).to_have_count(1)
-    expect(page.locator("#view h1")).to_have_text("Inbox")
+    # The router and another screen work from the cached shell and its last saved lists.
+    # (Inbox data is deliberately never stored, so Inbox is not used here.)
+    page.get_by_role("link", name="Workstreams").click()
+    expect(page.locator("#view [data-view='workstream']")).to_have_count(1)
+    expect(page.locator("#view h1")).to_have_text("Workstreams")
 
 
 def test_offline_banner(page, context, base_url):

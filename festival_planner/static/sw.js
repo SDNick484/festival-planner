@@ -6,8 +6,8 @@
 //   shell  "/", the manifest and every file under /static/, keyed by path (the ?v= hash is
 //          dropped; it is already in the cache name). Network first, so a reachable server always
 //          wins and a stored file is only a fallback.
-//   api    only GET /api/digest, /api/tasks (the list, with any query) and /api/workstreams,
-//          network first. A copy served instead of the network is marked with SERVED_HEADER so
+//   api    only GET /api/digest, /api/tasks (the list, with any query), /api/workstreams and
+//          /api/organizers (names for owner labels), network first. A copy served instead of the network is marked with SERVED_HEADER so
 //          the page can show "Offline: showing last saved".
 // What is never stored: anything that is not a GET (a write goes to the network and fails when
 // offline, it is never queued or replayed), /mcp/*, /api/emails/*, and every other /api/ path.
@@ -18,7 +18,7 @@ const SHELL_FILES = ["__SHELL_FILES__"];
 const SHELL_CACHE = `fp-shell-${VERSION}`;
 const API_CACHE = `fp-api-${VERSION}`;
 const SERVED_HEADER = "X-Served-From-Cache";
-const API_LISTS = new Set(["/api/digest", "/api/tasks", "/api/workstreams"]);
+const API_LISTS = new Set(["/api/digest", "/api/tasks", "/api/workstreams", "/api/organizers"]);
 // A tunnel or proxy in front of a down server answers with one of these instead of failing.
 const UNREACHABLE = new Set([502, 503, 504]);
 
