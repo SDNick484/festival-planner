@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from flask import Flask, Response, jsonify
 
 from festival_planner import auth, db, seed
+from festival_planner.api import register_api
+from festival_planner.mcp import PathTokenMiddleware, register_mcp
 
 if TYPE_CHECKING:
     from festival_planner.config import Config
@@ -43,5 +45,12 @@ def create_app(config: Config | None = None) -> Flask:
     @app.get("/healthz")
     def healthz():
         return jsonify(ok=True)
+
+    register_api(app)
+    # Machine clients (design §4.3): the MCP endpoint and the token-authenticated REST mirror.
+    # The middleware strips a /mcp/<secret> path token before Flask or gunicorn logs the path.
+    register_mcp(app)
+    register_api(app, "/mcp/api", "token")
+    app.wsgi_app = PathTokenMiddleware(app.wsgi_app)  # type: ignore[method-assign]
 
     return app

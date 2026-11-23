@@ -1,0 +1,53 @@
+# Copy to compose.yml (or keep instance specifics in deploy/local/, which is gitignored).
+# Secrets live in .env (see .env.example), never in this file. See docs/deploy.md.
+#
+# Build the image first:   docker build -t festival-planner:local .
+# Then:                    docker compose up -d
+
+services:
+  web:
+    image: festival-planner:local
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - fp-data:/data
+      - ./config.toml:/app/config.toml:ro
+    ports:
+      # Bind to the LAN or loopback address that cloudflared reaches. Never publish this port to
+      # the internet: Cloudflare Access is the front door.
+      - "8000:8000"
+
+  # --- worker: BEGIN (enabled by Task 15) ---------------------------------------------------
+  # Polls the capture mailbox and sends the digest. Leave it commented out until
+  # `festival_planner/worker.py` exists (Task 15 uncomments it); the module is not in the image
+  # before that and the container would exit at once.
+  #
+  # worker:
+  #   image: festival-planner:local
+  #   restart: unless-stopped
+  #   command: ["python", "-m", "festival_planner.worker"]
+  #   env_file: .env
+  #   volumes:
+  #     - fp-data:/data
+  #     - ./config.toml:/app/config.toml:ro
+  #   depends_on:
+  #     - web
+  # --- worker: END --------------------------------------------------------------------------
+
+  # --- cloudflared (optional): BEGIN ---------------------------------------------------------
+  # Run the tunnel connector here instead of on the host. In the Cloudflare dashboard, set the
+  # tunnel's public hostname (festival.example.com) to the service URL http://web:8000, and put
+  # the tunnel token in .env as TUNNEL_TOKEN=<tunnel-token> (never in this file).
+  #
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run
+  #   environment:
+  #     TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+  #   depends_on:
+  #     - web
+  # --- cloudflared (optional): END -----------------------------------------------------------
+
+volumes:
+  fp-data:

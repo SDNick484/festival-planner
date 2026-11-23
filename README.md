@@ -24,6 +24,12 @@ make dev
 Then open http://127.0.0.1:5000/healthz, which returns `{"ok": true}`. `config.toml` and `.env`
 are gitignored; `.env.example` lists the secrets that belong in the environment.
 
+## Deploying
+
+`Dockerfile` and `compose.example.yml` run the app in a container behind a Cloudflare Tunnel and
+Access. See [`docs/deploy.md`](docs/deploy.md) for the full guide (Tunnel, Access bypass for
+`/mcp/*` and `/healthz`, Gmail capture, backups with `scripts/backup.sh`, upgrades).
+
 ## Leak check and git hook
 
 This repository is public, so it must never contain real names, organizations, email addresses

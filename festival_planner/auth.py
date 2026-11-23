@@ -288,6 +288,7 @@ def _authenticate_token(kind: str) -> Response | None:
         log.warning("auth: token %s lacks write scope for %s", token.name, request.endpoint)
         return _deny(403)
     g.actor = Actor(token.name, token.name)
+    g.token_scope = token.scope  # /mcp shows a read token only the read tools
     return None
 
 
