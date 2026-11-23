@@ -7,6 +7,10 @@
 * Machine routes (`/mcp/*`, `@requires("read")` / `@requires("write")`) accept only a named,
   scoped token from `MCP_TOKENS`, as `Authorization: Bearer` or as a path token that Task 18's
   middleware moves into `environ[PATH_TOKEN_ENVIRON]`.
+* Share routes (`/s/*`, `@requires("share")`, Task 24) are reached without Access. The link's
+  token arrives in the path; `ShareTokenMiddleware` (api/share.py) moves it into
+  `environ[SHARE_TOKEN_ENVIRON]` before anything logs the path. An unknown, expired or revoked
+  link is a 404, the same in every case. No actor is set: share routes never write.
 * Presenting the other kind of credential is a 401. Failures return a generic body; the reason
   goes only to the server log, and tokens and JWTs are never logged.
 
@@ -31,16 +35,18 @@ import jwt
 from flask import Flask, Response, current_app, g, jsonify, request
 from jwt.algorithms import RSAAlgorithm
 
-from festival_planner.service import Actor
+from festival_planner.db import get_db
+from festival_planner.service import Actor, share
 
 if TYPE_CHECKING:
     from festival_planner.config import Config, Token
 
-AuthKind = Literal["web", "read", "write"]
+AuthKind = Literal["web", "read", "write", "share"]
 KINDS: tuple[str, ...] = get_args(AuthKind)
 
 JWT_HEADER = "Cf-Access-Jwt-Assertion"
 PATH_TOKEN_ENVIRON = "fp.path_token"  # noqa: S105 (an environ key name, not a secret)
+SHARE_TOKEN_ENVIRON = "fp.share_token"  # noqa: S105 (an environ key name, not a secret)
 JWT_LEEWAY_SECONDS = 30
 JWKS_REFETCH_SECONDS = 300
 JWKS_FETCH_TIMEOUT_SECONDS = 5
@@ -292,11 +298,25 @@ def _authenticate_token(kind: str) -> Response | None:
     return None
 
 
+def _authenticate_share() -> Response | None:
+    """Find the share link for the path token. Every failure is the same 404."""
+    raw = request.environ.get(SHARE_TOKEN_ENVIRON)
+    link = None
+    if raw and current_app.config.get("DATABASE") is not None:
+        link = share.lookup(get_db(), raw)
+    if link is None:
+        log.info("auth: unknown, expired or revoked share link")
+        return _deny(404)
+    g.share_link = link
+    return None
+
+
 def requires(kind: AuthKind) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Declare and enforce a route's auth. Sets `view._fp_auth = kind`.
 
     "web": an organizer's Access JWT (only for web routes such as `/api/*`).
     "read" / "write": a token with that scope (only for `/mcp/*`); "read" accepts either scope.
+    "share": a live share link's token (only for `/s/*`); sets `g.share_link`, not `g.actor`.
     """
     if kind not in KINDS:
         raise ValueError(f"unknown auth kind {kind!r}; expected one of {KINDS}")
@@ -304,7 +324,12 @@ def requires(kind: AuthKind) -> Callable[[Callable[..., Any]], Callable[..., Any
     def decorator(view: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(view)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            denial = _authenticate_web() if kind == "web" else _authenticate_token(kind)
+            if kind == "web":
+                denial = _authenticate_web()
+            elif kind == "share":
+                denial = _authenticate_share()
+            else:
+                denial = _authenticate_token(kind)
             if denial is not None:
                 return denial
             return view(*args, **kwargs)

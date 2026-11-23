@@ -72,6 +72,10 @@ successful poll, `null` before the first). Stopping it (`docker compose stop wor
    - `/mcp/*`: machine clients (Claude, Duet) cannot sign in through Access. The app authenticates
      them itself with the bearer or path tokens in `MCP_TOKENS`, and rejects everything else.
    - `/healthz`: uptime checks and the container health probe.
+   - `/s/*`: volunteer share links (section 9). Volunteers have no Access identity; the link's
+     own token is the credential, checked by the app.
+   - `/static/*`: the stylesheet and scripts the share page loads. These are the app's public code,
+     styles and icons (the same files as in this repository) and hold no event data.
 
    Do not bypass anything else: `/api/*` and the web pages accept only an Access identity.
 4. **AUD tag.** Open the Access application, copy its **Application Audience (AUD) tag**, and set
@@ -127,3 +131,21 @@ Migrations run on start and are applied in order inside transactions. Take a bac
 
 Keep anything particular to your deployment (your compose file, host names, cron entries, notes) in
 `deploy/local/`. It is gitignored, so it never reaches the public repository.
+
+## 9. Volunteer share links
+
+Organizers create read-only links on the Manage screen, under **Share links**: a label, one
+workstream or all of them, and how many days the link stays valid (1 to 365). The link
+(`https://festival.example.com/s/<token>`) is shown **once**, right after it is created: copy it
+then. The app stores only a SHA-256 hash of the token, so a lost link cannot be shown again; create
+a new one and revoke the old.
+
+A link shows task titles, statuses, due dates and owner display names, and milestone names and
+dates, for its scope. It never shows notes, links, waiting or blocked reasons, contacts, email,
+activity or budget. **Revoke** turns a link off at once; an expired, revoked or unknown link gets
+the same "not available" page. Share pages are sent with `Cache-Control: no-store` and
+`Referrer-Policy: no-referrer`, and the token is replaced by `redacted` in the app's access log
+lines. Anyone holding a link can read what it shows until it expires or is revoked, so prefer short
+lifetimes and one link per group.
+
+This needs the `/s/*` and `/static/*` Bypass entries from section 4.

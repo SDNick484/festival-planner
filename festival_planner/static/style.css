@@ -1450,3 +1450,82 @@ summary.tl-head::-webkit-details-marker {
     grid-column: 1 / -1;
   }
 }
+
+/* --- #24 Share links --- */
+.sh-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--gutter);
+}
+
+.sh-note {
+  margin: -8px 0 var(--gutter);
+}
+
+.sh-section {
+  margin-bottom: calc(var(--gutter) * 1.5);
+}
+
+.sh-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.sh-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.sh-item + .sh-item {
+  border-top: 1px solid var(--border);
+}
+
+.sh-title {
+  font-weight: 600;
+}
+
+.sh-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.875rem;
+}
+
+.sh-status {
+  font-weight: 600;
+}
+
+.sh-item[data-status="done"] .sh-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.sh-item[data-status="blocked"] .sh-status {
+  color: var(--danger);
+}
+
+.sh-item[data-status="waiting"] .sh-status {
+  color: var(--warn);
+}
+
+.sh-item[data-status="done"] .sh-status {
+  color: var(--ok);
+}
+
+.sh-error {
+  color: var(--danger);
+}
+
+.sh-links .sh-token {
+  display: block;
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+}

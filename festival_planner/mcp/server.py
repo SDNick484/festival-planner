@@ -93,12 +93,14 @@ class PathTokenMiddleware:
 
 
 _LOGGED_TOKEN_RE = re.compile(rf"(/mcp(?:/|%2[fF]))[^/?#\s\"']{{{MIN_TOKEN_SECRET_LENGTH},}}")
+# Share links (Task 24): any first segment under /s/ is a token (see api/share.py).
+_LOGGED_SHARE_RE = re.compile(r"(/s(?:/|%2[fF]))[^/?#\s\"']+")
 REDACTED = "<redacted>"
 
 
 class RedactPathTokenFilter(logging.Filter):
-    """Redacts `/mcp/<secret>` in log records from servers that log the raw request line
-    (werkzeug's development server). gunicorn already sees the rewritten path."""
+    """Redacts `/mcp/<secret>` and `/s/<token>` in log records from servers that log the raw
+    request line (werkzeug's development server). gunicorn already sees the rewritten path."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
@@ -106,6 +108,7 @@ class RedactPathTokenFilter(logging.Filter):
         except Exception:  # a malformed record is the logging module's problem, not ours
             return True
         redacted = _LOGGED_TOKEN_RE.sub(r"\1" + REDACTED, message)
+        redacted = _LOGGED_SHARE_RE.sub(r"\1" + REDACTED, redacted)
         if redacted != message:
             record.msg, record.args = redacted, None
         return True

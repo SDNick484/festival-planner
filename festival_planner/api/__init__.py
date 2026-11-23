@@ -3,6 +3,7 @@
 `register_api(app, prefix, auth)` mounts every handler at `prefix`. The web UI uses
 `register_api(app, "/api", "web")` (Access JWT). Task 18 mounts the same handlers for machine
 clients at `/mcp/api` with `auth="token"` (GET needs a `read` token, everything else `write`).
+`WEB_ONLY_MODULES` (share-link management) are mounted only with `auth="web"`.
 """
 
 from __future__ import annotations
@@ -19,12 +20,15 @@ from festival_planner.api import (
     event,
     inbox,
     milestones,
+    share,
     tasks,
     workstreams,
 )
 from festival_planner.api._common import Router, install_errors
 
 MODULES = (event, workstreams, tasks, milestones, contacts, activity, digest, inbox)
+# Organizer-only: machine tokens never create or see share links.
+WEB_ONLY_MODULES = (share,)
 _PREFIX_RE = re.compile(r"/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*")
 
 
@@ -43,7 +47,7 @@ def register_api(
     blueprint = Blueprint(name, __name__, url_prefix=prefix)
     install_errors(app, blueprint, prefix)
     router = Router(blueprint, auth)
-    for module in MODULES:
+    for module in MODULES + (WEB_ONLY_MODULES if auth == "web" else ()):
         module.register(router)
     app.register_blueprint(blueprint)
     return blueprint
