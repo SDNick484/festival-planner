@@ -9,7 +9,7 @@ import { h, mount } from "./dom.js";
 
 // tab: which tab is highlighted. Patterns: ":id" matches digits, a trailing "?" makes it optional.
 export const ROUTES = [
-  { path: "/", view: "home", ready: false, tab: "home", title: "Home" }, // #10
+  { path: "/", view: "home", ready: true, tab: "home", title: "Home" }, // #10
   { path: "/ws/:id?", view: "workstream", ready: false, tab: "ws", title: "Workstreams" }, // #11
   { path: "/task/:id", view: "task", ready: false, tab: "ws", title: "Task" }, // #11
   { path: "/timeline", view: "timeline", ready: false, tab: "timeline", title: "Timeline" }, // #12
