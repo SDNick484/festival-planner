@@ -8,8 +8,30 @@ import {
   formatDay,
   loadOrganizers,
   ownerLabel,
+  STATUSES,
   statusDot,
 } from "./taskbits.js";
+
+// Task 23: the List | Board choice is remembered in localStorage (which may be blocked or full:
+// the screen works without it) and only applies at 900px and up.
+const VIEW_KEY = "fp.ws-view";
+const WIDE = "(min-width: 900px)";
+
+function readViewMode() {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "board" ? "board" : "list";
+  } catch {
+    return "list";
+  }
+}
+
+function saveViewMode(mode) {
+  try {
+    localStorage.setItem(VIEW_KEY, mode);
+  } catch {
+    // Not remembered; the choice still holds until the screen is left.
+  }
+}
 
 export async function render(root, params) {
   if (params.id === undefined) return renderList(root);
@@ -96,6 +118,177 @@ function taskRow(task, organizers) {
   );
 }
 
+// --- the board (Task 23) --------------------------------------------------------------------
+
+// One column per status. A card can be dragged onto a column, or moved with the status select on
+// the card (the keyboard and screen-reader route). Both go through `moveTo`, which asks for a
+// reason inline before it saves Blocked, as the task screen does. `onSaved` redraws.
+function boardView(tasks, organizers, onSaved) {
+  let dragId = null;
+  let openPrompt = null; // closes the prompt of another card when a new one opens
+  const cards = new Map();
+
+  function buildCard(task) {
+    const note =
+      task.status === "blocked" && task.blocked_reason
+        ? `Blocked: ${task.blocked_reason}`
+        : task.status === "waiting" && task.waiting_on
+          ? `Waiting on ${task.waiting_on}`
+          : null;
+    const meta = [task.effective_due ? formatDay(task.effective_due) : null, task.owner ? ownerLabel(organizers, task.owner) : null]
+      .filter(Boolean)
+      .join(" · ");
+    const select = h(
+      "select",
+      { class: "board-status", "aria-label": `Status of ${task.title}`, on: { change: () => request(select.value) } },
+      STATUSES.map((s) => h("option", { value: s.id }, s.label)),
+    );
+    select.value = task.status;
+    const error = h("p", { class: "field-error", role: "alert" });
+    let prompt = null;
+
+    const closePrompt = () => {
+      prompt?.remove();
+      prompt = null;
+      if (openPrompt === closePrompt) openPrompt = null;
+      select.value = task.status;
+    };
+
+    async function save(status, reason, refocus) {
+      try {
+        const changes = status === "blocked" ? { status, blocked_reason: reason } : { status };
+        Object.assign(task, await api.patch(`/api/tasks/${task.id}`, changes));
+      } catch (e) {
+        select.value = task.status;
+        const message =
+          (e instanceof api.ApiError && (e.fields.blocked_reason || e.fields.status)) || errorText(e);
+        return message;
+      }
+      onSaved(refocus ? task.id : null);
+      return null;
+    }
+
+    function askReason() {
+      openPrompt?.();
+      const input = h("input", { type: "text", id: `board-reason-${task.id}`, autocomplete: "off" });
+      const promptError = h("p", { class: "field-error", role: "alert" });
+      const submit = async () => {
+        mount(promptError, "");
+        const message = await save("blocked", input.value.trim(), true);
+        if (message) mount(promptError, message);
+      };
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          submit();
+        }
+      });
+      prompt = h(
+        "div",
+        { class: "blocked-prompt" },
+        h("label", { for: input.id }, "Why is it blocked?"),
+        input,
+        h(
+          "div",
+          { class: "prompt-actions" },
+          h("button", { type: "button", class: "btn btn-primary btn-small", on: { click: submit } }, "Save"),
+          h("button", { type: "button", class: "btn btn-small", on: { click: () => { closePrompt(); select.focus(); } } }, "Cancel"),
+        ),
+        promptError,
+      );
+      openPrompt = closePrompt;
+      el.append(prompt);
+      input.focus();
+    }
+
+    // Used by the select (refocus: the board is redrawn) and by a drop.
+    async function request(status, refocus = true) {
+      mount(error, "");
+      if (status === task.status) {
+        select.value = task.status;
+        return;
+      }
+      if (status === "blocked") {
+        select.value = task.status; // the select shows the real status until a reason is saved
+        askReason();
+        return;
+      }
+      openPrompt?.();
+      const message = await save(status, null, refocus);
+      if (message) mount(error, message);
+    }
+
+    const el = h(
+      "li",
+      {
+        class: "board-card",
+        draggable: "true",
+        "data-id": task.id,
+        "data-status": task.status,
+        on: {
+          dragstart: (event) => {
+            dragId = task.id;
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", String(task.id));
+            el.classList.add("dragging");
+          },
+          dragend: () => {
+            dragId = null;
+            el.classList.remove("dragging");
+            for (const col of document.querySelectorAll(".board-column.drag-over")) col.classList.remove("drag-over");
+          },
+        },
+      },
+      h(
+        "a",
+        { class: "board-link", href: `#/task/${task.id}`, draggable: "false" },
+        h("span", { class: "task-title wrap" }, task.title),
+        note ? h("span", { class: "task-note wrap" }, note) : null,
+        meta ? h("span", { class: "task-meta muted" }, meta) : null,
+      ),
+      select,
+      error,
+    );
+    cards.set(task.id, { request });
+    return el;
+  }
+
+  function buildColumn(status) {
+    const inColumn = tasks.filter((t) => t.status === status.id).sort(byEffectiveDue);
+    const column = h(
+      "section",
+      {
+        class: "board-column",
+        "data-status": status.id,
+        "aria-label": status.label,
+        on: {
+          dragover: (event) => {
+            if (dragId === null) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            column.classList.add("drag-over");
+          },
+          dragleave: (event) => {
+            if (!column.contains(event.relatedTarget)) column.classList.remove("drag-over");
+          },
+          drop: (event) => {
+            event.preventDefault();
+            column.classList.remove("drag-over");
+            const id = dragId;
+            dragId = null;
+            if (id !== null) cards.get(id)?.request(status.id, false);
+          },
+        },
+      },
+      h("h3", { class: `board-heading status-${status.id}` }, status.label, " ", h("span", { class: "muted" }, `(${inColumn.length})`)),
+      h("ul", { class: "board-cards" }, inColumn.map(buildCard)),
+    );
+    return column;
+  }
+
+  return h("div", { class: "board" }, STATUSES.map(buildColumn));
+}
+
 function contactItem(contact) {
   const count = contact.emails.length;
   const sub = [contact.organization, contact.role].filter(Boolean).join(" · ");
@@ -126,23 +319,55 @@ async function renderDetail(root, id) {
 
   const summary = h("p", { class: "muted", "data-role": "summary" });
   const openBox = h("div", { "data-role": "open" });
+  const sectionTitle = h("h2", null, "Open tasks");
+  let mode = readViewMode();
+  const wide = window.matchMedia(WIDE);
+  const modeButtons = [
+    ["list", "List"],
+    ["board", "Board"],
+  ].map(([id, label]) =>
+    h("button", {
+      type: "button",
+      class: "btn btn-small",
+      "data-mode": id,
+      on: {
+        click: () => {
+          mode = id;
+          saveViewMode(mode);
+          draw();
+        },
+      },
+    }, label),
+  );
+  // Hidden below 900px by CSS; the board is never drawn there either, whatever was remembered.
+  const toggle = h("div", { class: "view-toggle", role: "group", "aria-label": "Task view" }, modeButtons);
   const doneBox = h("details", { class: "done-tasks", "data-role": "done" });
 
   // The sections that depend on the task list. Quick add calls this again after it saves.
-  // Task 23 adds a board toggle: it swaps what draws into `openBox` and leaves the rest alone.
-  function draw() {
+  // The List | Board toggle swaps what draws into `openBox` and hides the Done fold in Board.
+  // `focusId` puts focus back on that card's status select after a keyboard change redraws.
+  function draw(focusId = null) {
+    const board = mode === "board" && wide.matches;
+    for (const button of modeButtons) button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
+    mount(sectionTitle, board ? "Board" : "Open tasks");
+    doneBox.hidden = board;
     const open = tasks.filter((t) => t.status !== "done").sort(byEffectiveDue);
     const done = tasks.filter((t) => t.status === "done");
     mount(
       summary,
       `Owner: ${ownerLabel(organizers, ws.owner)} · ${done.length} of ${tasks.length} done`,
     );
-    mount(
-      openBox,
-      open.length
-        ? h("ul", { class: "task-list" }, open.map((t) => taskRow(t, organizers)))
-        : h("p", { class: "muted" }, "No open tasks."),
-    );
+    if (board) {
+      mount(openBox, boardView(tasks, organizers, draw));
+      if (focusId !== null) openBox.querySelector(`.board-card[data-id="${focusId}"] select`)?.focus();
+    } else {
+      mount(
+        openBox,
+        open.length
+          ? h("ul", { class: "task-list" }, open.map((t) => taskRow(t, organizers)))
+          : h("p", { class: "muted" }, "No open tasks."),
+      );
+    }
     mount(
       doneBox,
       h("summary", null, `Done (${done.length})`),
@@ -201,9 +426,12 @@ async function renderDetail(root, id) {
     h("a", { class: "back", href: "#/ws" }, "← Workstreams"),
     h("h1", { class: "wrap" }, ws.name),
     summary,
-    h("section", { class: "ws-section" }, h("h2", null, "Open tasks"), openBox),
+    h("section", { class: "ws-section" }, h("div", { class: "section-head" }, sectionTitle, toggle), openBox),
     addForm,
     contactSection,
     doneBox,
   );
+  // Crossing 900px swaps List and Board. The listener ends itself once the screen is gone.
+  const onWidth = () => (openBox.isConnected ? draw() : wide.removeEventListener("change", onWidth));
+  wide.addEventListener("change", onWidth);
 }
