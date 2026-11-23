@@ -8,6 +8,8 @@ Activity:
 - filing (from any channel) logs `file_email` on the task, with the email's `forward_note` as
   the activity note, so the organizer's one-liner shows up in the task's history.
 - dismissing logs `dismiss` on the email item.
+- the retention purge (`purge_bodies`) logs one `system` activity per run that clears bodies, with
+  the count in the note. A run that clears nothing changes nothing, so it logs nothing.
 
 The IMAP state and `meta` writes are bookkeeping, not model changes, so they log no activity.
 """
@@ -16,11 +18,20 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import date, timedelta
 from typing import Any
 
 from festival_planner.config import Config
 from festival_planner.mail.parse import ParsedEmail
-from festival_planner.service import Actor, NotFound, ValidationError, activity, meta, tasks
+from festival_planner.service import (
+    Actor,
+    NotFound,
+    ValidationError,
+    activity,
+    event,
+    meta,
+    tasks,
+)
 from festival_planner.service._common import MAX_NAME, is_live, now_iso, transaction
 
 TABLE = "email_item"
@@ -28,6 +39,7 @@ STATES = ("inbox", "filed", "dismissed")
 JSON_COLUMNS = ("to_addrs", "cc_addrs", "attachment_names")
 LAST_POLL_KEY = "last_email_poll"
 NO_SUBJECT_TITLE = "(no subject)"
+PURGE_ACTOR = Actor("system", "system")
 
 
 def _norm(address: str | None) -> str:
@@ -265,3 +277,37 @@ def record_poll(con: sqlite3.Connection, at: str) -> None:
 
 def last_email_poll(con: sqlite3.Connection) -> str | None:
     return meta.get(con, LAST_POLL_KEY)
+
+
+# --- retention purge -----------------------------------------------------------------------
+
+
+def _event_date(con: sqlite3.Connection, cfg: Config) -> date:
+    """The event date from the event row; the config's value before the event is set up."""
+    try:
+        return date.fromisoformat(event.get(con)["event_date"])
+    except NotFound:
+        return cfg.event_date
+
+
+def purge_bodies(con: sqlite3.Connection, cfg: Config, today: date) -> int:
+    """Clear the body of every stored email once `event_date + email_retention_days` has passed.
+
+    Only `body_text` (set to NULL) and `body_purged_at` (set to now) change; the metadata stays.
+    Idempotent: rows already purged are not touched, so a later run on the same day returns 0.
+    Returns the number of bodies cleared. Logs one system activity when that number is above 0,
+    with the count in its note; `entity_id` is 0 because one run covers many items.
+    """
+    cutoff = _event_date(con, cfg) + timedelta(days=cfg.email_retention_days)
+    if today <= cutoff:
+        return 0
+    with transaction(con):
+        cur = con.execute(
+            "UPDATE email_item SET body_text = NULL, body_purged_at = ?"
+            " WHERE body_text IS NOT NULL",
+            (now_iso(),),
+        )
+        count = cur.rowcount
+        if count:
+            activity.record(con, PURGE_ACTOR, TABLE, 0, "purge", None, str(count))
+    return count

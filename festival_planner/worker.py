@@ -216,7 +216,7 @@ def main(
 
 # --- Daily jobs: one register_daily(...) line each ------------------------------------------
 # Each reserved line below is replaced by its task's registration.
-# Task 17 (retention purge): register_daily("festival_planner.service.emails:purge_bodies")
+register_daily("festival_planner.service.emails:purge_bodies")
 
 # Task 21 (weekly digest): register_daily("festival_planner.mail.digest:<daily entry point>")
 
