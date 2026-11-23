@@ -1,0 +1,50 @@
+#!/sbin/openrc-run
+# Festival Planner web service: gunicorn serving festival_planner.wsgi:app, supervised.
+# Install as /etc/init.d/festival-planner-web (install.sh does this). Settings and secrets come
+# from /etc/conf.d/festival-planner (root-owned, mode 600), shared with the worker service.
+
+description="Festival Planner web (gunicorn)"
+
+# OpenRC only reads /etc/conf.d/<service name> by itself; the shared file is read here, with
+# set -a so that every variable in it is exported to the supervised process.
+FP_CONF="${FP_CONF:-/etc/conf.d/festival-planner}"
+if [ -r "$FP_CONF" ]; then
+	set -a
+	# shellcheck disable=SC1090
+	. "$FP_CONF"
+	set +a
+fi
+FP_ROOT="${FP_ROOT:-/opt/festival-planner}"
+
+supervisor="supervise-daemon"
+command="${FP_ROOT}/.venv/bin/gunicorn"
+# -b: loopback by default, because cloudflared runs on this host. To listen elsewhere set
+# FP_WEB_BIND (for example '192.0.2.10:8000') in /etc/conf.d/festival-planner. Never expose this
+# port to the internet: Cloudflare Access is the front door.
+# --preload loads the config and runs migrations and seeding once, before the workers fork.
+# --no-control-socket: the service user has no writable home directory for the control socket.
+command_args="-w 2 -b ${FP_WEB_BIND:-127.0.0.1:8000} --preload --no-control-socket festival_planner.wsgi:app"
+command_user="festival:festival"
+directory="${FP_ROOT}"
+output_log="/var/log/festival-planner/web.log"
+error_log="/var/log/festival-planner/web.log"
+respawn_delay=5
+respawn_max=0
+export PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+
+depend() {
+	need net
+	use logger
+}
+
+start_pre() {
+	if [ ! -r "$FP_CONF" ]; then
+		eerror "$FP_CONF is missing: copy deploy/alpine/festival-planner.confd there (mode 600)"
+		return 1
+	fi
+	if [ ! -x "$command" ]; then
+		eerror "$command not found: run deploy/alpine/install.sh first"
+		return 1
+	fi
+	checkpath --directory --owner festival:festival --mode 0750 /var/log/festival-planner
+}

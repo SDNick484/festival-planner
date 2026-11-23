@@ -4,6 +4,10 @@ One deployment serves one event. This guide uses placeholders throughout: `festi
 for the public name, `<host>` for the machine that runs the container, and `<tunnel-token>` for the
 Cloudflare Tunnel token. Keep your real values in `deploy/local/`, which is gitignored.
 
+There are two supported ways to run it: Docker with Compose (sections 1 to 9, below) and a native
+install on Alpine Linux with OpenRC and no Docker (the section "Alpine (native, no Docker)" at the
+end). The Cloudflare, email capture, share-link and backup-restore guidance applies to both.
+
 ```
 phone / browser --> Cloudflare Access --> Cloudflare Tunnel --> http://<host>:8000 (web)
 Claude / Duet   --> /mcp/* (Bypass, token auth in the app) ---^
@@ -149,3 +153,193 @@ lines. Anyone holding a link can read what it shows until it expires or is revok
 lifetimes and one link per group.
 
 This needs the `/s/*` and `/static/*` Bypass entries from section 4.
+
+## Alpine (native, no Docker)
+
+The same app, run as two OpenRC services on an Alpine Linux host (a small LXC or VM) with no
+container runtime. It uses the same entry points as the image: `gunicorn --preload
+festival_planner.wsgi:app` for the web service and `python -m festival_planner.worker` for the
+worker, both as the unprivileged system user `festival`. The Docker path above stays supported;
+pick one per host, never both against the same data. The CI `alpine` job installs exactly as below
+and serves `/healthz` under musl.
+
+```
+phone / browser --> Cloudflare Access --> Cloudflare Tunnel --> cloudflared (same host)
+                                                                      |
+Claude / Duet   --> /mcp/* (Bypass, token auth in the app) ---> http://127.0.0.1:8000 (web)
+```
+
+### Prerequisites
+
+- Alpine 3.24 or newer, with OpenRC (the default init), and root. Alpine ships Python 3.14, which
+  satisfies the project's `>=3.12`. A host that is reachable only through the tunnel is fine.
+- Cloudflare, mailbox and `sqlite3` needs as in section 1. `install.sh` installs `sqlite3`.
+
+### Install
+
+```sh
+apk add git
+git clone <repository-url> /opt/festival-planner
+cd /opt/festival-planner
+sh deploy/alpine/install.sh --with-cron
+```
+
+`install.sh` is idempotent (run it again after every upgrade), needs root, never starts a service
+and never writes a secret. It:
+
+- installs `python3`, `tzdata`, `sqlite` and `openrc` with `apk`, and `uv` from Alpine when the
+  release packages it (otherwise the pinned uv release binary, checksum verified);
+- creates the system user and group `festival` (no login shell, no password) and the directories
+  `/var/lib/festival-planner` (data, mode 700), `/var/backups/festival-planner` (backups, mode 700),
+  `/var/log/festival-planner` and `/etc/festival-planner` (settings, group-readable);
+- runs `uv sync --frozen --no-dev` in the checkout, which creates `.venv` from the locked versions
+  and the system Python. The code and `.venv` stay root-owned: the service user cannot change them;
+- installs `/etc/init.d/festival-planner-web` and `/etc/init.d/festival-planner-worker`, and the
+  example `/etc/conf.d/festival-planner` (root-owned, mode 600) **only if that file does not exist**;
+- with `--with-cron`, installs the daily backup job (see Backups below).
+
+The checkout is the install root: the init scripts expect it at `/opt/festival-planner`. To put it
+elsewhere, set `FP_ROOT='<path>'` in `/etc/conf.d/festival-planner`.
+
+### Configure
+
+```sh
+cp /opt/festival-planner/config.example.toml /etc/festival-planner/config.toml
+chown root:festival /etc/festival-planner/config.toml
+chmod 640 /etc/festival-planner/config.toml
+```
+
+Edit `config.toml` as in section 2 (event, organizers, seeds, mailbox host and user), and set
+`data_dir = "/var/lib/festival-planner"`. It must be an absolute path the service user owns: the
+example's relative `data` would be inside the root-owned install root.
+
+Secrets go in `/etc/conf.d/festival-planner`, the same variables as `.env.example`: `CF_TEAM_DOMAIN`,
+`CF_AUD` (section 4), `MCP_TOKENS`, `IMAP_PASSWORD`, `SMTP_PASSWORD`. Generate each machine token
+as in section 2. The file is read by the shell: keep every value in single quotes. Keep it root-owned
+with mode 600 (`install.sh` re-applies that), and do not set `DEV_AUTH_EMAIL` or `FLASK_ENV`.
+
+The web service listens on `127.0.0.1:8000`, because `cloudflared` runs on the same host. To listen on
+another address (a tunnel connector on a different machine), set
+`FP_WEB_BIND='<lan-address>:8000'` in the conf.d file, and keep the port closed to everything else.
+
+### Start
+
+```sh
+rc-update add festival-planner-web default
+rc-update add festival-planner-worker default
+rc-service festival-planner-web start
+rc-service festival-planner-worker start
+wget -qO- http://127.0.0.1:8000/healthz     # {"last_email_poll":null,"ok":true}
+```
+
+Both services use `supervise-daemon`, so a crash is respawned after five seconds, and both need
+networking. The worker starts after the web service, which applies migrations and the first-run
+seed. Run exactly one worker. `rc-service festival-planner-web restart` and `... status` work as
+usual; stopping the worker is clean (it exits 0 on SIGTERM). An invalid config makes the web
+service exit at start; the supervisor keeps retrying every five seconds, so read the reason in
+`web.log` and fix `config.toml` or the conf.d file.
+
+### Logs
+
+```sh
+tail -f /var/log/festival-planner/web.log /var/log/festival-planner/worker.log
+```
+
+Both files are written by the supervisor (gunicorn's own messages and the worker's log lines; no
+message bodies, no credentials). Rotate them with `apk add logrotate` and a file such as
+`/etc/logrotate.d/festival-planner` (`/var/log/festival-planner/*.log { weekly rotate 4 compress
+copytruncate missingok }`).
+
+### Monitoring the worker
+
+The worker serves no port. Watch `last_email_poll` in the web service's `/healthz`, as in section 3:
+it is the UTC time of the last successful mailbox poll (`null` before the first, and always `null`
+when capture is off). Alert when it is older than a few poll intervals. `rc-service
+festival-planner-worker status` tells you only that the process is up.
+
+### cloudflared as a native service
+
+Run the tunnel connector on the same host and point the tunnel's public hostname
+(`festival.example.com`) at `http://127.0.0.1:8000`; then set up Access and its Bypass policy as in
+section 4. Alpine's stable repositories do not package `cloudflared` (the `testing` repository does,
+if you accept packages from there), so use the official static release binary, which runs on musl:
+
+```sh
+version=<release-version>                     # the latest tag on the cloudflared releases page
+arch=amd64                                    # arm64 on an aarch64 host
+wget -O /usr/local/bin/cloudflared \
+  https://github.com/cloudflare/cloudflared/releases/download/$version/cloudflared-linux-$arch
+echo "<sha256-from-the-release-page>  /usr/local/bin/cloudflared" | sha256sum -c -
+chmod 755 /usr/local/bin/cloudflared
+addgroup -S cloudflared && adduser -S -D -H -s /sbin/nologin -G cloudflared cloudflared
+```
+
+Put the tunnel token in `/etc/conf.d/cloudflared` (`TUNNEL_TOKEN='<tunnel-token>'`, root-owned,
+mode 600) and add `/etc/init.d/cloudflared` (mode 755):
+
+```sh
+#!/sbin/openrc-run
+description="Cloudflare Tunnel connector"
+conf=/etc/conf.d/cloudflared
+if [ -r "$conf" ]; then set -a; . "$conf"; set +a; fi
+supervisor="supervise-daemon"
+command="/usr/local/bin/cloudflared"
+command_args="tunnel --no-autoupdate run"
+command_user="cloudflared:cloudflared"
+output_log="/var/log/cloudflared.log"
+error_log="/var/log/cloudflared.log"
+respawn_delay=5
+respawn_max=0
+depend() {
+	need net
+	after festival-planner-web
+}
+```
+
+then `rc-update add cloudflared default && rc-service cloudflared start`. To update the connector,
+repeat the download with the new version (verify the checksum again) and restart the service.
+`cloudflared` makes only outbound connections, so nothing needs to listen on the network.
+
+### Backups
+
+`scripts/backup.sh` takes a consistent copy with SQLite's `.backup`, checks it, and rotates it, as in
+section 6. Here the database is a plain directory, so no volume lookup is needed:
+
+```sh
+su -s /bin/sh festival -c \
+  '/opt/festival-planner/scripts/backup.sh /var/lib/festival-planner /var/backups/festival-planner'
+```
+
+`install.sh --with-cron` installs this as the crontab `/etc/crontabs/festival` (owned by root, which
+busybox `crond` requires; the job runs as `festival`), daily at 03:17:
+
+```
+17 3 * * * /opt/festival-planner/scripts/backup.sh /var/lib/festival-planner /var/backups/festival-planner
+```
+
+Turn `crond` on with `rc-update add crond default && rc-service crond start`. To install the line by
+hand, put it in that file yourself. The same cautions as in section 6 apply: backups hold email
+bodies and the whole activity log, so keep the folder private and encrypt any off-box copy. To
+restore: stop both services, copy a backup over `/var/lib/festival-planner/festival.db` (delete any
+`festival.db-wal` and `festival.db-shm`; keep owner `festival`, mode 600), and start them again.
+
+### Upgrades
+
+```sh
+cd /opt/festival-planner
+su -s /bin/sh festival -c '/opt/festival-planner/scripts/backup.sh /var/lib/festival-planner /var/backups/festival-planner'
+git fetch --tags && git checkout <release-tag>
+UV_PYTHON=/usr/bin/python3 UV_PYTHON_DOWNLOADS=never uv sync --frozen --no-dev
+rc-service festival-planner-web restart
+rc-service festival-planner-worker restart
+```
+
+Migrations run when the web service starts and are applied in order inside transactions. Running
+`sh deploy/alpine/install.sh` again instead of the `uv sync` line does the same and also refreshes
+the init scripts and Alpine packages. If the release changes `config.example.toml`, compare it with
+your `/etc/festival-planner/config.toml`; the conf.d file is never overwritten.
+
+### Instance specifics
+
+Keep your real conf.d values, cron entries and notes in `deploy/local/` (gitignored), never in
+`deploy/alpine/`, which holds only placeholders.

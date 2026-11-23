@@ -101,3 +101,109 @@ jobs:
           done
           docker logs fp
           exit 1
+
+  # The native Alpine deployment (docs/deploy.md, "Alpine (native, no Docker)"): install exactly as
+  # deploy/alpine/install.sh does, then run the real OpenRC scripts under busybox and musl. The job
+  # drives an `alpine` container with docker run/exec (not `container:`), because JavaScript actions
+  # such as checkout do not run reliably inside Alpine.
+  alpine:
+    runs-on: ubuntu-latest
+    env:
+      # alpine:3.24 (Python 3.14, uv and OpenRC packaged), pinned by digest.
+      ALPINE_IMAGE: alpine@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the Alpine container with the checkout copied to the install root
+        run: |
+          set -eu
+          # --init: a real PID 1 that reaps processes, as an Alpine host's init does (OpenRC waits
+          # for a stopped supervisor to disappear, and a zombie never does).
+          docker run -d --init --name fp-alpine -v "$GITHUB_WORKSPACE:/src:ro" "$ALPINE_IMAGE" sleep infinity
+          docker exec fp-alpine sh -eu -c '
+            mkdir /opt/festival-planner
+            tar -C /src --exclude=./.git -cf - . | tar -C /opt/festival-planner -xf -
+          '
+      - name: Shellcheck the scripts
+        run: |
+          set -eu
+          # The init scripts set variables that openrc-run reads (SC2034).
+          docker exec fp-alpine sh -eu -c '
+            apk add --no-cache shellcheck
+            cd /opt/festival-planner
+            shellcheck -s sh deploy/alpine/install.sh scripts/backup.sh
+            shellcheck -s sh -e SC2034 deploy/alpine/festival-planner-web.initd \
+              deploy/alpine/festival-planner-worker.initd
+          '
+      - name: Install (install.sh, twice, to prove it is idempotent)
+        run: |
+          set -eu
+          docker exec fp-alpine sh -eu -c '
+            cd /opt/festival-planner
+            sh deploy/alpine/install.sh --with-cron
+            sh deploy/alpine/install.sh --with-cron
+          '
+      - name: Serve with the OpenRC scripts and the example config, and check /healthz
+        run: |
+          set -eu
+          docker exec fp-alpine sh -eu -c '
+            # The example config, with its data_dir pointed at the service data directory.
+            # DEV_AUTH_EMAIL and FLASK_ENV stay unset (commented out in the conf.d example):
+            # this is the production path.
+            sed "s|^data_dir = .*|data_dir = \"/var/lib/festival-planner\"|" \
+              /opt/festival-planner/config.example.toml > /etc/festival-planner/config.toml
+            grep -q "^data_dir = \"/var/lib/festival-planner\"" /etc/festival-planner/config.toml
+            chown root:festival /etc/festival-planner/config.toml
+            chmod 640 /etc/festival-planner/config.toml
+
+            # OpenRC without a running init: the runlevel marker is all rc-service needs. It warns
+            # that it cannot create cgroups in a container, which is harmless.
+            mkdir -p /run/openrc
+            touch /run/openrc/softlevel
+            rc-service festival-planner-web start
+            rc-service festival-planner-worker start
+
+            ok=""
+            for _ in $(seq 1 30); do
+              if wget -qO- http://127.0.0.1:8000/healthz; then ok=yes; echo; break; fi
+              sleep 1
+            done
+            if [ -z "$ok" ]; then
+              tail -n 50 /var/log/festival-planner/*.log
+              exit 1
+            fi
+
+            # Both services run as the unprivileged user, and neither is root.
+            rc-service festival-planner-web status
+            rc-service festival-planner-worker status
+            procs=$(ps -o user,args | grep -E "gunicorn|festival_planner.worker" | grep -v -e grep -e supervise-daemon)
+            echo "$procs"
+            test -n "$procs"
+            test "$(echo "$procs" | awk "{print \$1}" | sort -u)" = festival
+            sleep 3
+            grep -q "worker started" /var/log/festival-planner/worker.log
+
+            # Stopping the worker is clean (it exits 0 on SIGTERM), and so is the web service.
+            rc-service festival-planner-worker stop
+            grep -q "worker stopped" /var/log/festival-planner/worker.log
+            rc-service festival-planner-web stop
+
+            # The documented backup command, as the service user.
+            su -s /bin/sh festival -c \
+              "/opt/festival-planner/scripts/backup.sh /var/lib/festival-planner /var/backups/festival-planner"
+            ls /var/backups/festival-planner/festival-*.db
+          '
+      - name: Show the service logs (on failure)
+        if: failure()
+        run: docker exec fp-alpine sh -c 'tail -n 80 /var/log/festival-planner/*.log' || true
+      - name: Run the tests under musl (the browser tests need Chromium and run in the ui job)
+        run: |
+          set -eu
+          docker exec fp-alpine sh -eu -c '
+            apk add --no-cache git   # a few tests build throwaway git repositories
+            cd /opt/festival-planner
+            export UV_PYTHON=/usr/bin/python3 UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
+            uv sync --frozen
+            uv run --frozen pytest -q --ignore=tests/ui
+          '
