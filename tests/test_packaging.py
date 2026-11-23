@@ -7,6 +7,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -250,3 +252,178 @@ def test_ci_has_a_pinned_alpine_job():
     # Every action is pinned by full commit SHA.
     for ref in re.findall(r"uses:\s*\S+@(\S+)", ci):
         assert re.fullmatch(r"[0-9a-f]{40}", ref), ref
+
+
+# --- deploy/alpine/check.sh: an install the service user cannot run fails loudly ----------------
+# Each case builds a small fake install root (a .venv with a `gunicorn` script whose shebang names
+# its interpreter) and runs check.sh against it. As root (the Alpine CI job) the checks run as
+# `nobody`, so permissions still mean something; otherwise as the current user.
+
+
+def _check_user() -> str:
+    import getpass
+    import os
+
+    return "nobody" if os.geteuid() == 0 else getpass.getuser()
+
+
+@pytest.fixture
+def base(tmp_path):
+    """Where a fake install is built. As root, pytest's own temp folder (/tmp/pytest-of-root, mode
+    700) is closed to `nobody`, so use a fresh folder directly under /tmp instead."""
+    import os
+    import shutil
+    import tempfile
+
+    if os.geteuid() != 0:
+        yield tmp_path
+        return
+    path = Path(tempfile.mkdtemp(prefix="fp-check-", dir="/tmp"))
+    path.chmod(0o755)
+    yield path
+    shutil.rmtree(path, ignore_errors=True)
+
+
+def _fake_install(base: Path, *, shebang_root: Path | None = None, data_dir: str | None = None):
+    """A minimal install root under base/opt/fp, plus a config.toml. Returns (root, config)."""
+    import os
+    import sys
+
+    base.chmod(0o755)
+    root = base / "opt" / "fp"
+    bin_dir = root / ".venv" / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "python").symlink_to(sys.executable)
+    interp = (shebang_root or root) / ".venv" / "bin" / "python"
+    gunicorn = bin_dir / "gunicorn"
+    gunicorn.write_text(f"#!{interp}\nprint('gunicorn (version 99)')\n", encoding="utf-8")
+    gunicorn.chmod(0o755)
+    data = base / "var" / "lib" / "fp"
+    data.mkdir(parents=True)
+    if os.geteuid() == 0:
+        import pwd
+
+        nobody = pwd.getpwnam("nobody")
+        os.chown(data, nobody.pw_uid, nobody.pw_gid)
+    for d in (base / "opt", base / "var", base / "var" / "lib", root, root / ".venv", bin_dir):
+        d.chmod(0o755)
+    data.chmod(0o700)
+    # The service user must not be able to change its own code.
+    root.chmod(0o555)
+    config = base / "config.toml"
+    config.write_text(f'[event]\nname = "x"\n\ndata_dir = "{data_dir or data}"\n', encoding="utf-8")
+    config.chmod(0o644)
+    return root, config
+
+
+def _run_check(root: Path, config: Path | None = None) -> subprocess.CompletedProcess:
+    import os
+
+    env = {**os.environ, "FP_USER": _check_user()}
+    args = ["sh", str(ROOT / ALPINE / "check.sh"), str(root)]
+    if config is not None:
+        args.append(str(config))
+    return subprocess.run(args, capture_output=True, text=True, env=env, check=False)  # noqa: S603
+
+
+def test_alpine_check_passes_a_good_install(base):
+    root, config = _fake_install(base)
+    result = _run_check(root, config)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "ok" in result.stdout
+
+
+def test_alpine_check_flags_a_venv_built_at_another_path(base):
+    root, config = _fake_install(base, shebang_root=Path("/root/src/festival-planner"))
+    result = _run_check(root, config)
+    assert result.returncode == 1
+    assert "built at another path" in result.stderr
+    assert "/root/src/festival-planner/.venv/bin/python" in result.stderr
+
+
+def test_alpine_check_flags_a_root_the_service_user_cannot_enter(base):
+    root, config = _fake_install(base)
+    (base / "opt").chmod(0o700 if _check_user() == "nobody" else 0o000)
+    try:
+        result = _run_check(root, config)
+    finally:
+        (base / "opt").chmod(0o755)
+    assert result.returncode == 1
+    assert "cannot enter" in result.stderr and str(base / "opt") in result.stderr
+
+
+def test_alpine_check_flags_code_the_service_user_can_change(base):
+    import os
+
+    root, config = _fake_install(base)
+    if os.geteuid() == 0:
+        import pwd
+
+        nobody = pwd.getpwnam("nobody")
+        os.chown(root, nobody.pw_uid, nobody.pw_gid)
+    root.chmod(0o755)
+    result = _run_check(root, config)
+    assert result.returncode == 1
+    assert "can write to its own code" in result.stderr
+
+
+def test_alpine_check_flags_a_relative_data_dir(base):
+    root, config = _fake_install(base, data_dir="data")
+    result = _run_check(root, config)
+    assert result.returncode == 1
+    assert "data_dir" in result.stderr and "absolute" in result.stderr
+
+
+def test_alpine_check_flags_a_data_dir_the_service_user_cannot_write(base):
+    root, config = _fake_install(base)
+    (base / "var" / "lib" / "fp").chmod(0o500 if _check_user() != "nobody" else 0o700)
+    if _check_user() == "nobody":
+        import os
+
+        os.chown(base / "var" / "lib" / "fp", 0, 0)
+    result = _run_check(root, config)
+    assert result.returncode == 1
+    assert "cannot write" in result.stderr and "data_dir" in result.stderr
+
+
+def test_alpine_check_without_a_config_checks_the_code_only(base):
+    root, _ = _fake_install(base)
+    result = _run_check(root, base / "missing.toml")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "no settings file" in result.stdout
+
+
+def test_alpine_install_rebuilds_a_venv_built_at_another_path(tmp_path):
+    """Run just the stale-venv step of install.sh against a moved checkout."""
+    script = (ROOT / ALPINE / "install.sh").read_text(encoding="utf-8")
+    block = re.search(r"(# stale-venv-begin\n.*?# stale-venv-end\n)", script, flags=re.S)
+    assert block
+    root, _ = _fake_install(tmp_path, shebang_root=Path("/root/src/festival-planner"))
+    root.chmod(0o755)
+    harness = f'say() {{ :; }}\nroot="{root}"\n{block.group(1)}'
+    _sh("-eu", "-c", harness)
+    assert not (root / ".venv").exists()
+    # A venv built in place is kept.
+    (tmp_path / "second").mkdir()
+    root2, _ = _fake_install(tmp_path / "second")
+    root2.chmod(0o755)
+    _sh("-eu", "-c", harness.replace(str(root), str(root2)))
+    assert (root2 / ".venv" / "bin" / "gunicorn").exists()
+
+
+def test_alpine_install_and_init_scripts_run_the_check():
+    install = (ROOT / ALPINE / "install.sh").read_text(encoding="utf-8")
+    assert re.search(r'sh "\$here/check\.sh" "\$root"', install)
+    for name in ("festival-planner-web.initd", "festival-planner-worker.initd"):
+        script = (ROOT / ALPINE / name).read_text(encoding="utf-8")
+        start_pre = script.split("start_pre() {", 1)[1]
+        assert 'deploy/alpine/check.sh" "$FP_ROOT"' in start_pre, name
+
+
+def test_deploy_doc_tunnel_target_matches_each_path():
+    doc = _text("docs/deploy.md")
+    section4 = doc.split("## 4.", 1)[1].split("\n## 5.", 1)[0]
+    # Section 4 no longer gives one target for both paths: Docker and Alpine each get theirs.
+    assert "http://web:8000" in section4 or "Docker" in section4
+    assert "127.0.0.1:8000" in section4 and "FP_WEB_BIND" in section4
+    assert "deploy/alpine/check.sh" in doc

@@ -66,9 +66,20 @@ successful poll, `null` before the first). Stopping it (`docker compose stop wor
 ## 4. Cloudflare Tunnel and Access
 
 1. **Tunnel.** In Cloudflare Zero Trust, create a tunnel and add a public hostname
-   `festival.example.com` with service `http://<host>:8000`. Run the connector on the host
-   (`cloudflared service install <tunnel-token>`), or enable the optional `cloudflared` service in
-   `compose.yml`, with `TUNNEL_TOKEN=<tunnel-token>` in `.env` and the service URL `http://web:8000`.
+   `festival.example.com`. Its **service** URL is where the connector (`cloudflared`) can reach
+   the web service, which depends on where each of them runs:
+
+   | Web service | Connector | Service URL |
+   |---|---|---|
+   | Docker (this guide) | the optional `cloudflared` service in `compose.yml` (`TUNNEL_TOKEN=<tunnel-token>` in `.env`) | `http://web:8000` |
+   | Docker | on the host (`cloudflared service install <tunnel-token>`) | `http://127.0.0.1:8000` |
+   | Alpine, native (default bind `127.0.0.1:8000`) | native, on the same host (section "Alpine") | `http://127.0.0.1:8000` |
+   | Alpine, native, with `FP_WEB_BIND='<lan-address>:8000'` | anywhere else, including a Docker container on the same host | `http://<lan-address>:8000` |
+
+   A connector in a Docker container cannot use `127.0.0.1` to reach a service on its host:
+   inside the container that address is the container itself. Use the last row (or run that
+   container with `--network host`). Write `127.0.0.1`, not `localhost`, which may resolve to the
+   IPv6 `::1`. A wrong service URL shows up as a Cloudflare **502** after you sign in.
 2. **Access application.** Create a self-hosted Access application for `festival.example.com` with
    an **Allow** policy listing exactly the two organizer email addresses.
 3. **Bypass policy.** Add a second policy, action **Bypass**, for these paths, ordered above the
@@ -84,7 +95,8 @@ successful poll, `null` before the first). Stopping it (`docker compose stop wor
    Do not bypass anything else: `/api/*` and the web pages accept only an Access identity.
 4. **AUD tag.** Open the Access application, copy its **Application Audience (AUD) tag**, and set
    `CF_AUD` in `.env`. Set `CF_TEAM_DOMAIN` to your Zero Trust team domain (a bare host name such as
-   `<team>.cloudflareaccess.com`). Restart with `docker compose up -d`.
+   `<team>.cloudflareaccess.com`). Restart with `docker compose up -d` (on Alpine, put them in
+   `/etc/conf.d/festival-planner` and `rc-service festival-planner-web restart`).
 
 The app verifies the Access JWT itself, so a request that reaches port 8000 without going through
 Access is still refused. Even so, do not expose port 8000 to the internet: bind it to the LAN or
@@ -196,10 +208,29 @@ and never writes a secret. It:
   and the system Python. The code and `.venv` stay root-owned: the service user cannot change them;
 - installs `/etc/init.d/festival-planner-web` and `/etc/init.d/festival-planner-worker`, and the
   example `/etc/conf.d/festival-planner` (root-owned, mode 600) **only if that file does not exist**;
-- with `--with-cron`, installs the daily backup job (see Backups below).
+- with `--with-cron`, installs the daily backup job (see Backups below);
+- ends by running `deploy/alpine/check.sh` (below), and fails if the install cannot run as
+  `festival`.
 
 The checkout is the install root: the init scripts expect it at `/opt/festival-planner`. To put it
-elsewhere, set `FP_ROOT='<path>'` in `/etc/conf.d/festival-planner`.
+elsewhere, set `FP_ROOT='<path>'` in `/etc/conf.d/festival-planner`, and pick a path the service
+user can reach: **not under `/root` or a home directory**, which `festival` cannot enter. If you
+move a checkout, run `install.sh` again: the virtualenv's scripts name their interpreter by
+absolute path, so `install.sh` rebuilds a `.venv` that was built somewhere else.
+
+### Check the install
+
+```sh
+sh /opt/festival-planner/deploy/alpine/check.sh
+```
+
+`check.sh` runs as root and checks, as the `festival` user, that it can enter the install root and
+run `.venv/bin/gunicorn`, that the virtualenv was built where it is, that it cannot write to its
+own code (keep the checkout `root:root`), and that `data_dir` in
+`/etc/festival-planner/config.toml` is an absolute path it can write to. It prints one line per
+problem, with the fix. `install.sh` runs it at the end, and both services run it before they
+start, so a broken install stops `rc-service ... start` with the reason instead of starting a
+supervisor that cannot run the app. Run it again after editing the settings.
 
 ### Configure
 
@@ -211,16 +242,18 @@ chmod 640 /etc/festival-planner/config.toml
 
 Edit `config.toml` as in section 2 (event, organizers, seeds, mailbox host and user), and set
 `data_dir = "/var/lib/festival-planner"`. It must be an absolute path the service user owns: the
-example's relative `data` would be inside the root-owned install root.
+example's relative `data` would be inside the root-owned install root (`check.sh` refuses it).
 
 Secrets go in `/etc/conf.d/festival-planner`, the same variables as `.env.example`: `CF_TEAM_DOMAIN`,
 `CF_AUD` (section 4), `MCP_TOKENS`, `IMAP_PASSWORD`, `SMTP_PASSWORD`. Generate each machine token
 as in section 2. The file is read by the shell: keep every value in single quotes. Keep it root-owned
 with mode 600 (`install.sh` re-applies that), and do not set `DEV_AUTH_EMAIL` or `FLASK_ENV`.
 
-The web service listens on `127.0.0.1:8000`, because `cloudflared` runs on the same host. To listen on
-another address (a tunnel connector on a different machine), set
-`FP_WEB_BIND='<lan-address>:8000'` in the conf.d file, and keep the port closed to everything else.
+The web service listens on `127.0.0.1:8000`, for a native `cloudflared` on the same host. To listen on
+another address, set `FP_WEB_BIND='<lan-address>:8000'` in the conf.d file and keep the port closed to
+everything but the connector. You need that when the connector runs on another machine, **or in a
+Docker container on this host** (inside a container, `127.0.0.1` is the container itself). Point
+the tunnel's service URL at the same address (the table in section 4).
 
 ### Start
 
@@ -229,7 +262,7 @@ rc-update add festival-planner-web default
 rc-update add festival-planner-worker default
 rc-service festival-planner-web start
 rc-service festival-planner-worker start
-wget -qO- http://127.0.0.1:8000/healthz     # {"last_email_poll":null,"ok":true}
+wget -qO- http://127.0.0.1:8000/healthz     # {"last_email_poll":null,"ok":true} (or your FP_WEB_BIND)
 ```
 
 Both services use `supervise-daemon`, so a crash is respawned after five seconds, and both need
