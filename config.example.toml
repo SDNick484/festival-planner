@@ -6,7 +6,7 @@
 name = "Example Fall Festival"
 date = 2099-10-10          # local date of the event
 timezone = "UTC"           # IANA name, e.g. "Europe/Berlin"; "today" is computed in this zone
-data_dir = "data"          # SQLite database and other runtime files
+data_dir = "data"          # SQLite database and other runtime files (relative to the working directory)
 
 # Exactly the people who may log in. Aliases are other addresses each person sends or forwards
 # from; they are used to recognise senders, never for login.
@@ -31,14 +31,23 @@ workstreams = [
   "Marketing",
   "Budget",
 ]
-# Milestones as days before the event (T-60 is 60 days before).
-milestone_days_before = [60, 45, 30, 21, 14, 7, 1]
+# Milestones are defined relative to the event date: days_before = 60 is 60 days before it.
+milestones = [
+  { name = "T-60", days_before = 60 },
+  { name = "T-45", days_before = 45 },
+  { name = "T-30", days_before = 30 },
+  { name = "T-21", days_before = 21 },
+  { name = "T-14", days_before = 14 },
+  { name = "T-7", days_before = 7 },
+  { name = "T-1", days_before = 1 },
+]
 
 [needs_attention]
 waiting_stale_days = 5     # a task waiting longer than this needs attention
 
 [email]
-# Capture mailbox (read-only IMAP) and outgoing digest. Omit imap_host to turn capture off.
+# Capture mailbox (read-only IMAP) and outgoing digest. Omit imap_host to turn capture off;
+# imap_user is required when imap_host is set. Passwords live in .env, never here.
 imap_host = "imap.example.com"
 imap_user = "planner@example.com"
 imap_label = "Festival"
