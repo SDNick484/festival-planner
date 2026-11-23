@@ -13,8 +13,8 @@ export const ROUTES = [
   { path: "/", view: "home", ready: true, tab: "home", title: "Home" }, // #10
   { path: "/ws/:id?", view: "workstream", ready: true, tab: "ws", title: "Workstreams" }, // #11
   { path: "/task/:id", view: "task", ready: true, tab: "ws", title: "Task" }, // #11
-  { path: "/timeline", view: "timeline", ready: false, tab: "timeline", title: "Timeline" }, // #12
-  { path: "/manage", view: "manage", ready: false, tab: "home", title: "Manage" }, // #12
+  { path: "/timeline", view: "timeline", ready: true, tab: "timeline", title: "Timeline" }, // #12
+  { path: "/manage", view: "manage", ready: true, tab: "home", title: "Manage" }, // #12
   { path: "/inbox", view: "inbox", ready: true, tab: "inbox", title: "Inbox" }, // #16
 ];
 

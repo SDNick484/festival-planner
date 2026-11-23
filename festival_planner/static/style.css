@@ -1065,3 +1065,388 @@ textarea {
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+/* --- #12 Timeline and Manage --- */
+/* Timeline: a vertical rail with one dot per milestone and a "Today" marker between past and future. */
+.tl-list {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 28px;
+  list-style: none;
+}
+
+.tl-list::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 9px;
+  width: 2px;
+  background: var(--border);
+  content: "";
+}
+
+.tl-item,
+.tl-event,
+.tl-today {
+  position: relative;
+  margin: 0 0 10px;
+}
+
+.tl-item {
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.tl-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  list-style: none;
+  cursor: default;
+}
+
+summary.tl-head {
+  cursor: pointer;
+}
+
+summary.tl-head::-webkit-details-marker {
+  display: none;
+}
+
+.tl-title {
+  font-weight: 600;
+}
+
+.tl-date,
+.tl-count {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.tl-count {
+  grid-column: 1 / -1;
+}
+
+.tl-dot {
+  position: absolute;
+  top: 16px;
+  left: -26px;
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+}
+
+.tl-past {
+  opacity: 0.8;
+}
+
+.tl-done {
+  border-color: var(--ok);
+}
+
+.tl-done .tl-dot {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.tl-done .tl-title,
+.tl-done .tl-count {
+  color: var(--ok);
+}
+
+.tl-tasks {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.tl-task {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tl-task:last-child {
+  border-bottom: 0;
+}
+
+.tl-task-title {
+  min-width: 0;
+}
+
+.tl-status {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.tl-task[data-status="done"] .tl-status {
+  color: var(--ok);
+}
+
+.tl-task[data-status="blocked"] .tl-status {
+  color: var(--danger);
+}
+
+.tl-task[data-status="waiting"] .tl-status {
+  color: var(--warn);
+}
+
+.tl-today {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 4px 12px;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-radius: var(--radius);
+}
+
+.tl-today .tl-date {
+  color: inherit;
+}
+
+.tl-today-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tl-today::before {
+  position: absolute;
+  top: 50%;
+  left: -26px;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  content: "";
+}
+
+.tl-event {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+/* Manage: sections of forms. Fields stack on a phone and sit side by side from 600px. */
+.mg-section {
+  margin: 0 0 calc(var(--gutter) * 2);
+}
+
+.mg-list {
+  margin: 0 0 var(--gutter);
+  padding: 0;
+  list-style: none;
+}
+
+.mg-list > li {
+  margin: 0 0 10px;
+}
+
+.mg-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.mg-item > .mg-form {
+  margin-top: 8px;
+}
+
+.mg-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mg-label,
+.mg-check {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.mg-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+}
+
+.mg-field input,
+.mg-field select,
+.mg-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mg-check input {
+  width: 22px;
+  height: 22px;
+}
+
+.mg-invalid input,
+.mg-invalid select,
+.mg-invalid textarea {
+  border-color: var(--danger);
+}
+
+.mg-error {
+  min-height: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.mg-error:empty {
+  display: none;
+}
+
+.mg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.mg-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mg-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.mg-primary {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mg-danger-quiet {
+  color: var(--danger);
+}
+
+.mg-danger {
+  color: #ffffff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.mg-move {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.mg-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.mg-confirm-text {
+  min-width: 0;
+  font-weight: 600;
+}
+
+.mg-message {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.mg-message:empty {
+  display: none;
+}
+
+.mg-message[data-state="ok"] {
+  color: var(--ok);
+}
+
+.mg-message[data-state="error"] {
+  color: var(--danger);
+}
+
+.mg-derived {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.mg-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.mg-item > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  align-items: baseline;
+  min-height: 44px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.mg-item > .mg-form {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.mg-summary-name {
+  font-weight: 600;
+}
+
+.mg-summary-note {
+  font-size: 0.875rem;
+}
+
+.mg-add-details {
+  margin-top: 10px;
+}
+
+@media (min-width: 600px) {
+  .mg-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+  }
+
+  .mg-form > .mg-wide,
+  .mg-form > .mg-actions,
+  .mg-form > .mg-derived {
+    grid-column: 1 / -1;
+  }
+}
