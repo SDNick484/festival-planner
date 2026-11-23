@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from contextlib import closing
 from typing import TYPE_CHECKING
 
 from flask import Flask, Response, jsonify
 
-from festival_planner import auth, db
+from festival_planner import auth, db, seed
 
 if TYPE_CHECKING:
     from festival_planner.config import Config
@@ -29,6 +30,9 @@ def create_app(config: Config | None = None) -> Flask:
     app = Flask(__name__)
     app.config["FP"] = config
     db.init_app(app)
+    if config is not None:
+        with closing(db.connect(app.config["DATABASE"])) as con:
+            seed.bootstrap(con, config)
     auth.init_app(app)
 
     @app.after_request

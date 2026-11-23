@@ -41,6 +41,34 @@ def with_event(con):
         )
 
 
+def test_event_create_once(con):
+    data = {"name": "Example Fall Festival", "event_date": "2099-10-10", "timezone": "UTC"}
+    ev = event.create(con, WEB, data)
+    assert ev["name"] == "Example Fall Festival"
+    assert ev["goal_note"] == ""
+    assert event.get(con) == ev
+    entry = log(con, "event", 1)[0]
+    assert entry["action"] == "create"
+    assert entry["diff"] == {
+        "name": [None, "Example Fall Festival"],
+        "event_date": [None, "2099-10-10"],
+        "timezone": [None, "UTC"],
+    }
+    with pytest.raises(ValidationError):  # a second event row is refused
+        event.create(con, WEB, data)
+    assert len(log(con, "event", 1)) == 1
+
+
+def test_event_create_validates(con):
+    with pytest.raises(ValidationError) as exc:
+        event.create(
+            con, WEB, {"name": "Example", "event_date": "soon", "timezone": "Nowhere/City"}
+        )
+    assert set(exc.value.errors) == {"event_date", "timezone"}
+    with pytest.raises(ValidationError):
+        event.create(con, WEB, {"name": "Example", "event_date": "2099-10-10"})
+
+
 def test_event_get_missing_raises(con):
     with pytest.raises(NotFound):
         event.get(con)

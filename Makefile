@@ -1,4 +1,4 @@
-.PHONY: dev test lint format check leak-check hooks
+.PHONY: dev test lint format check leak-check seed-demo hooks
 
 dev:
 	FLASK_ENV=development uv run flask --app festival_planner.web:create_app run --debug
@@ -15,6 +15,10 @@ format:
 
 leak-check:
 	uv run python scripts/leak_check.py
+
+# Development only: adds fictional demo tasks and contacts to the database named in config.toml.
+seed-demo:
+	FLASK_ENV=development uv run python -m festival_planner.seed
 
 # The same commands as the CI jobs (gitleaks runs in CI only).
 check: test lint leak-check
