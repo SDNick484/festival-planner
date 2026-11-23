@@ -30,6 +30,36 @@ are gitignored; `.env.example` lists the secrets that belong in the environment.
 Access. See [`docs/deploy.md`](docs/deploy.md) for the full guide (Tunnel, Access bypass for
 `/mcp/*` and `/healthz`, Gmail capture, backups with `scripts/backup.sh`, upgrades).
 
+## Claude and Duet
+
+The app serves an MCP endpoint at `/mcp` (JSON-RPC over HTTP POST, no sessions). It is reached with
+an MCP token from `config.toml`: each token has a name (recorded as the source of every change it
+makes, for example `claude`) and a scope. A `read` token sees only the read tools; a `write` token
+also sees the write tools (`create_task`, `update_task`, `log_note`, `file_email`,
+`dismiss_email`, `upsert_contact`). There is no delete tool. Keep tokens secret: anyone holding
+one can act as that connector.
+
+- **claude.ai custom connector.** Add a custom connector and give it the URL
+  `https://festival.example.com/mcp/<token>`, with your own host name and the token's secret in
+  place of the placeholders. The connector form has no header field, so the secret travels in the
+  path; the server removes it before logging.
+- **Claude Code.** Send the token as a header instead:
+
+  ```sh
+  claude mcp add --transport http festival https://festival.example.com/mcp \
+    --header "Authorization: Bearer <token>"
+  ```
+
+- **Duet.** Duet's connection method is still to be confirmed. Use a `read` token for it unless
+  it needs to make changes.
+- **HTTP fallback.** If a client cannot speak MCP, `GET /mcp/api/digest` with the same token
+  (either the `Authorization` header or the path form
+  `https://festival.example.com/mcp/<token>/api/digest`) returns the same digest as the
+  `get_digest` tool as JSON.
+
+The `/mcp/*` paths bypass Cloudflare Access, so the token is their only protection (see
+[`docs/deploy.md`](docs/deploy.md)).
+
 ## Leak check and git hook
 
 This repository is public, so it must never contain real names, organizations, email addresses
