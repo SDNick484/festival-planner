@@ -18,20 +18,22 @@ services:
       - "8000:8000"
 
   # --- worker: BEGIN (enabled by Task 15) ---------------------------------------------------
-  # Polls the capture mailbox and sends the digest. Leave it commented out until
-  # `festival_planner/worker.py` exists (Task 15 uncomments it); the module is not in the image
-  # before that and the container would exit at once.
-  #
-  # worker:
-  #   image: festival-planner:local
-  #   restart: unless-stopped
-  #   command: ["python", "-m", "festival_planner.worker"]
-  #   env_file: .env
-  #   volumes:
-  #     - fp-data:/data
-  #     - ./config.toml:/app/config.toml:ro
-  #   depends_on:
-  #     - web
+  # Polls the capture mailbox and runs the daily jobs. Run exactly one worker: two would poll
+  # the same label twice (harmless, since capture dedups by Message-ID, but wasteful).
+  worker:
+    image: festival-planner:local
+    restart: unless-stopped
+    command: ["python", "-m", "festival_planner.worker"]
+    env_file: .env
+    volumes:
+      - fp-data:/data
+      - ./config.toml:/app/config.toml:ro
+    depends_on:
+      - web
+    # The image's HEALTHCHECK probes the web port, which the worker does not serve. Monitor
+    # last_email_poll on the web service's /healthz instead.
+    healthcheck:
+      disable: true
   # --- worker: END --------------------------------------------------------------------------
 
   # --- cloudflared (optional): BEGIN ---------------------------------------------------------

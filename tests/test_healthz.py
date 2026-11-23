@@ -1,3 +1,3 @@
 def test_healthz(client):
     r = client.get("/healthz")
-    assert r.status_code == 200 and r.json == {"ok": True}
+    assert r.status_code == 200 and r.json == {"ok": True, "last_email_poll": None}

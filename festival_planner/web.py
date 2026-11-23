@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify
 from festival_planner import auth, db, seed
 from festival_planner.api import register_api
 from festival_planner.mcp import PathTokenMiddleware, register_mcp
+from festival_planner.service import emails
 
 if TYPE_CHECKING:
     from festival_planner.config import Config
@@ -44,7 +45,11 @@ def create_app(config: Config | None = None) -> Flask:
 
     @app.get("/healthz")
     def healthz():
-        return jsonify(ok=True)
+        # last_email_poll: UTC time of the worker's last successful poll (null if never).
+        last_poll = None
+        if app.config["DATABASE"] is not None:
+            last_poll = emails.last_email_poll(db.get_db())
+        return jsonify(ok=True, last_email_poll=last_poll)
 
     register_api(app)
     # Machine clients (design §4.3): the MCP endpoint and the token-authenticated REST mirror.

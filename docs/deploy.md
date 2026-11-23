@@ -54,8 +54,10 @@ The container runs as the unprivileged user `app` (uid 10001). The SQLite databa
 run when the web container starts, and an invalid config stops it with an error in
 `docker compose logs web`.
 
-The `worker` service (mailbox polling and the digest) is commented out in `compose.yml` until the
-worker exists; uncomment the block marked `worker: BEGIN` / `END` when it does.
+The `worker` service (mailbox polling and the daily jobs) runs `python -m festival_planner.worker`
+from the same image. Run exactly one. It has no web port, so its container healthcheck is off;
+monitor `last_email_poll` in the web service's `/healthz` instead (the UTC time of the last
+successful poll, `null` before the first). Stopping it (`docker compose stop worker`) is clean.
 
 ## 4. Cloudflare Tunnel and Access
 
