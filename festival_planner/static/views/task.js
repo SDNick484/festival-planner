@@ -4,6 +4,7 @@
 import { h, mount } from "../dom.js";
 import * as api from "../api.js";
 import { STATUSES, errorText, fetchAll, formatDay, loadOrganizers, ownerLabel } from "./taskbits.js";
+import { bodyViewer, emailMeta, forwardNote } from "./inbox.js";
 
 const FIELD_LABELS = {
   title: "title",
@@ -82,6 +83,7 @@ function stamp(iso, timezone) {
 class TaskScreen {
   constructor(root, { task, ws, organizers, milestones, timezone }) {
     Object.assign(this, { root, task, ws, organizers, milestones, timezone });
+    this.emails = task.emails ?? []; // only GET returns them, so keep them apart from `task`, which a PATCH replaces
     this.queue = Promise.resolve(); // saves run one at a time, in the order they were made
     this.activityToken = 0;
     this.errors = {}; // field name -> its <p class="field-error">
@@ -321,14 +323,28 @@ class TaskScreen {
     );
   }
 
-  // --- Task 16: linked emails ---
-  // A hidden section until #16 fills it in. It receives the live task through `this.task` and
-  // should re-render from `sync()` or its own fetch; leave the rest of the screen alone.
+  // --- linked emails ---
+  // Emails filed to this task: who sent it, the organizer's note, and the text on demand. The
+  // section stays hidden while there are none. Email text is untrusted and only ever a text node.
   linkedEmailsSection() {
     this.emailsSection = h(
       "section",
-      { class: "task-section", "data-section": "linked-emails", hidden: true },
+      { class: "task-section", "data-section": "linked-emails", hidden: this.emails.length === 0 },
       h("h2", null, "Linked emails"),
+      h(
+        "ul",
+        { class: "email-list", "aria-label": "Linked emails" },
+        this.emails.map((email) =>
+          h(
+            "li",
+            { class: "email-item", "data-email-id": email.id },
+            h("h3", { class: "email-subject wrap" }, email.subject || "(no subject)"),
+            emailMeta(email),
+            forwardNote(email),
+            bodyViewer(email, "Show email text"),
+          ),
+        ),
+      ),
     );
     return this.emailsSection;
   }

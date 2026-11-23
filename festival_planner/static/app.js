@@ -15,7 +15,7 @@ export const ROUTES = [
   { path: "/task/:id", view: "task", ready: true, tab: "ws", title: "Task" }, // #11
   { path: "/timeline", view: "timeline", ready: false, tab: "timeline", title: "Timeline" }, // #12
   { path: "/manage", view: "manage", ready: false, tab: "home", title: "Manage" }, // #12
-  { path: "/inbox", view: "inbox", ready: false, tab: "inbox", title: "Inbox" }, // #16
+  { path: "/inbox", view: "inbox", ready: true, tab: "inbox", title: "Inbox" }, // #16
 ];
 
 const TABS = [

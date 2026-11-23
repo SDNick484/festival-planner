@@ -17,13 +17,14 @@ from festival_planner.api import (
     contacts,
     digest,
     event,
+    inbox,
     milestones,
     tasks,
     workstreams,
 )
 from festival_planner.api._common import Router, install_errors
 
-MODULES = (event, workstreams, tasks, milestones, contacts, activity, digest)
+MODULES = (event, workstreams, tasks, milestones, contacts, activity, digest, inbox)
 _PREFIX_RE = re.compile(r"/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*")
 
 
