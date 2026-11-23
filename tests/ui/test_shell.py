@@ -8,13 +8,23 @@ import re
 from pathlib import Path
 
 import pytest
+from playwright.sync_api import expect
 
 ROOT = Path(__file__).resolve().parents[2]
 STATIC = ROOT / "festival_planner" / "static"
 
 TABS = [("Home", "#/"), ("Workstreams", "#/ws"), ("Timeline", "#/timeline"), ("Inbox", "#/inbox")]
-# Every route in the table, plus ones that must show "not found" instead of breaking.
-ROUTES = ["#/", "#/ws", "#/ws/1", "#/task/1", "#/timeline", "#/inbox", "#/manage", "#/nope"]
+# Every route in the table (hash, the view it shows), plus ones that must show "not found".
+ROUTES = [
+    ("#/", "home"),
+    ("#/ws", "workstream"),
+    ("#/ws/1", "workstream"),
+    ("#/task/1", "task"),
+    ("#/timeline", "timeline"),
+    ("#/inbox", "inbox"),
+    ("#/manage", "manage"),
+    ("#/nope", "not-found"),
+]
 
 # Collect CSP violations and uncaught errors from inside the page, before any script runs.
 WATCH = """
@@ -37,11 +47,13 @@ def test_no_console_errors_or_csp_violations(page, base_url):
     response = page.goto(base_url + "/")
     csp = response.headers["content-security-policy"]
     assert "unsafe-inline" not in csp and "script-src 'self'" in csp
-    for route in ROUTES:
-        page.goto(base_url + "/" + route)
-        page.wait_for_selector("#view [data-view]")
+    for hash_, view in ROUTES:
+        # Only a hash changes after the first goto, so the old screen is still on the page until
+        # the router swaps it: wait for the expected view, not for any view.
+        page.goto(base_url + "/" + hash_)
+        expect(page.locator("#view [data-view]")).to_have_attribute("data-view", view)
     page.reload()
-    page.wait_for_selector("#view [data-view]")
+    expect(page.locator("#view [data-view]")).to_have_attribute("data-view", "not-found")
 
     assert page.evaluate("window.__problems") == []
     assert console == []
@@ -49,32 +61,32 @@ def test_no_console_errors_or_csp_violations(page, base_url):
 
 def test_shell_loads_and_tabs_navigate(page, base_url):
     page.goto(base_url + "/")
-    assert page.title() == "Home · Festival Planner"
+    expect(page).to_have_title("Home · Festival Planner")
     nav = page.get_by_role("navigation", name="Primary")
     links = nav.get_by_role("link")
     assert links.all_inner_texts() == [name for name, _ in TABS]
     # Home is the start page and is marked as the current tab.
-    assert page.locator("#view [data-view='home']").count() == 1
-    assert links.nth(0).get_attribute("aria-current") == "page"
+    expect(page.locator("#view [data-view='home']")).to_have_count(1)
+    expect(links.nth(0)).to_have_attribute("aria-current", "page")
 
+    # Every check after a click waits (auto-retrying) for the router to render the new screen.
     for index, (name, hash_) in enumerate(TABS):
         links.nth(index).click()
         page.wait_for_url(f"**/{hash_}")
-        page.wait_for_selector("#view [data-view]")
-        assert nav.get_by_role("link", name=name).get_attribute("aria-current") == "page"
-        assert page.locator("[aria-current='page']").count() == 1
-        assert page.locator("#view h1").inner_text() == name
-        assert page.title() == f"{name} · Festival Planner"
+        expect(page).to_have_title(f"{name} · Festival Planner")
+        expect(nav.get_by_role("link", name=name)).to_have_attribute("aria-current", "page")
+        expect(page.locator("[aria-current='page']")).to_have_count(1)
+        expect(page.locator("#view h1")).to_have_text(name)
 
     # Deep links and the back button.
     page.goto(base_url + "/#/task/42")
-    assert page.locator("#view [data-view='task']").get_attribute("data-id") == "42"
+    expect(page.locator("#view [data-view='task']")).to_have_attribute("data-id", "42")
     page.go_back()
-    assert page.locator("#view [data-view='inbox']").count() == 1
+    expect(page.locator("#view [data-view='inbox']")).to_have_count(1)
     page.goto(base_url + "/#/nope")
-    assert "Not found" in page.locator("#view h1").inner_text()
+    expect(page.locator("#view h1")).to_have_text("Not found")
     page.goto(base_url + "/#/ws/not-a-number")
-    assert "Not found" in page.locator("#view h1").inner_text()
+    expect(page.locator("#view h1")).to_have_text("Not found")
 
 
 def test_assets_are_content_hashed_and_manifest_is_served(page, base_url):
@@ -102,10 +114,12 @@ def test_layout_columns_and_color_scheme(page, base_url):
     columns = "getComputedStyle(document.querySelector('.view-home')).gridTemplateColumns"
     page.set_viewport_size({"width": 390, "height": 800})
     page.goto(base_url + "/")
-    page.wait_for_selector("[data-view='home']")
+    home = page.locator(".view-home")
+    expect(home).to_have_css("display", "block")
     assert len(page.evaluate(columns).split()) == 1
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
     page.set_viewport_size({"width": 1000, "height": 800})
+    expect(home).to_have_css("display", "grid")
     assert len(page.evaluate(columns).split()) == 2
 
     page.emulate_media(color_scheme="light")
