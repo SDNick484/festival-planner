@@ -6,6 +6,7 @@
 // To ship a view, add static/views/<view>.js and set that route's `ready` to true: one line in
 // ROUTES. A route that is not ready shows a "coming soon" placeholder and loads nothing.
 import { h, mount } from "./dom.js";
+import { registerServiceWorker } from "./offline.js";
 
 // tab: which tab is highlighted. Patterns: ":id" matches digits, a trailing "?" makes it optional.
 export const ROUTES = [
@@ -124,3 +125,4 @@ async function show() {
 document.getElementById("app").append(tabBar());
 window.addEventListener("hashchange", show);
 show();
+registerServiceWorker(import.meta.url);

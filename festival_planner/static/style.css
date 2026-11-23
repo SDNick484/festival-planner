@@ -430,3 +430,26 @@ textarea {
     grid-column: 2;
   }
 }
+
+/* --- #26 Offline --- */
+.offline-banner,
+.offline-alert {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 8px var(--gutter);
+  font-size: 0.9rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.offline-banner {
+  background: var(--surface);
+  color: var(--warn);
+}
+
+.offline-alert {
+  background: var(--danger);
+  color: var(--accent-text);
+  border-bottom-color: var(--danger);
+}

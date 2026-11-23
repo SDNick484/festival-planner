@@ -50,3 +50,18 @@ def test_manifest_is_public_and_typed(client):
     assert resp.status_code == 200
     assert resp.mimetype == "application/manifest+json"
     assert resp.get_json(force=True)["start_url"] == "/"
+
+
+def test_service_worker_is_public_versioned_and_revalidated(client):
+    resp = client.get("/sw.js")
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/javascript"
+    assert resp.headers["Cache-Control"] == "no-cache"
+    script = resp.get_data(as_text=True)
+    assert f'const VERSION = "{ui.asset_version()}"' in script
+    assert "__ASSET_VERSION__" not in script and "__SHELL_FILES__" not in script
+    # The shell list names the page, the manifest and the static files, but not the worker.
+    files = ui.shell_files()
+    assert files[:2] == ["/", "/manifest.webmanifest"]
+    assert "/static/app.js" in files and "/static/sw.js" not in files
+    assert all(f'"{path}"' in script for path in files)

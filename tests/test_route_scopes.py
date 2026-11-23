@@ -60,7 +60,7 @@ def test_route_scope_check_catches_violations(tmp_path):
 
 
 def test_public_allow_list_is_exact():
-    for path in ("/healthz", "/", "/manifest.webmanifest", "/static/<path:filename>"):
+    for path in ("/healthz", "/", "/manifest.webmanifest", "/sw.js", "/static/<path:filename>"):
         assert is_public_rule(path), path
     for path in ("/healthz/x", "/static", "/staticfoo", "/api", "/mcp", "/index.html"):
         assert not is_public_rule(path), path

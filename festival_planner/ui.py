@@ -1,12 +1,13 @@
-"""The browser shell: `/` (index.html with content-hashed asset URLs), the manifest, and static
-caching. The files themselves live in `festival_planner/static/` and are served by Flask's
-standard `/static/` route. All of these routes are on the public allow-list (auth.py); the data
-behind them is only reachable through `/api/*`.
+"""The browser shell: `/` (index.html with content-hashed asset URLs), the manifest, the service
+worker (`/sw.js`), and static caching. The files themselves live in `festival_planner/static/` and
+are served by Flask's standard `/static/` route. All of these routes are on the public allow-list
+(auth.py); the data behind them is only reachable through `/api/*`.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -16,6 +17,7 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 VERSION_LENGTH = 10
 _ASSET_RE = re.compile(r'((?:src|href)="/static/[^"?#]+)"')
 IMMUTABLE = "public, max-age=31536000, immutable"
+SERVICE_WORKER = "sw.js"
 
 
 def asset_version(static_dir: Path = STATIC_DIR) -> str:
@@ -36,6 +38,26 @@ def render_index(static_dir: Path, version: str) -> str:
     return _ASSET_RE.sub(lambda m: f'{m.group(1)}?v={version}"', html)
 
 
+def shell_files(static_dir: Path = STATIC_DIR) -> list[str]:
+    """Every URL the service worker stores as the app shell: the page, the manifest and each
+    file under static/ (the worker itself is not one of them)."""
+    files = sorted(
+        p.relative_to(static_dir).as_posix()
+        for p in static_dir.rglob("*")
+        if p.is_file() and p.name != SERVICE_WORKER
+    )
+    return ["/", "/manifest.webmanifest", *(f"/static/{name}" for name in files)]
+
+
+def render_service_worker(static_dir: Path, version: str) -> str:
+    """static/sw.js with this build's asset hash (the cache name's suffix, so a deploy retires
+    the old shell) and the shell file list filled in."""
+    script = (static_dir / SERVICE_WORKER).read_text(encoding="utf-8")
+    return script.replace("__ASSET_VERSION__", version).replace(
+        '"__SHELL_FILES__"', json.dumps(shell_files(static_dir))[1:-1]
+    )
+
+
 def register_ui(app: Flask, static_dir: Path = STATIC_DIR) -> None:
     version = asset_version(static_dir)
     index_html = render_index(static_dir, version)
@@ -51,6 +73,16 @@ def register_ui(app: Flask, static_dir: Path = STATIC_DIR) -> None:
         resp = send_from_directory(
             static_dir, "manifest.webmanifest", mimetype="application/manifest+json"
         )
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+    worker_js = render_service_worker(static_dir, version)
+
+    @app.get("/sw.js")
+    def service_worker():
+        # At the root so its scope is the whole app. Revalidated on every check so a deploy
+        # reaches browsers at once (the browser also bypasses its HTTP cache for this file).
+        resp = Response(worker_js, mimetype="text/javascript")
         resp.headers["Cache-Control"] = "no-cache"
         return resp
 

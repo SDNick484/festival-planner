@@ -48,7 +48,7 @@ JWKS_MAX_BYTES = 1 << 20
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 # Routes that need no auth declaration (Global Constraints). Matched against the rule string.
-PUBLIC_RULES = frozenset({"/healthz", "/", "/manifest.webmanifest"})
+PUBLIC_RULES = frozenset({"/healthz", "/", "/manifest.webmanifest", "/sw.js"})
 PUBLIC_PREFIXES = ("/static/",)
 
 _DENIAL_BODIES = {401: "unauthorized", 403: "forbidden", 404: "not found"}

@@ -1,5 +1,9 @@
 // Same-origin JSON client for /api. Lists come back as bare arrays; a failure throws ApiError
 // carrying the status and the server's per-field messages ({"error", "fields"}).
+// A write that cannot reach the server fails with status 0 and the message "You're offline; change
+// not saved", which the shell also shows as an alert: writes are never queued. A read that the
+// service worker answered from its stored copy raises the "Offline: showing last saved" banner.
+import { SERVED_HEADER, WRITE_FAILED_TEXT, noteRead, noteWriteFailed } from "./offline.js";
 
 export class ApiError extends Error {
   constructor(status, fields, message) {
@@ -23,8 +27,13 @@ async function request(method, path, body) {
   try {
     res = await fetch(path, init);
   } catch {
+    if (method !== "GET") {
+      noteWriteFailed();
+      throw new ApiError(0, {}, WRITE_FAILED_TEXT);
+    }
     throw new ApiError(0, {}, "Cannot reach the server");
   }
+  if (method === "GET" && res.ok) noteRead(res.headers.get(SERVED_HEADER) === "1");
   let data = null;
   if (res.status !== 204) {
     try {
