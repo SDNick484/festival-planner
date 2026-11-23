@@ -43,5 +43,11 @@ start_pre() {
 		eerror "$command not found: run deploy/alpine/install.sh first"
 		return 1
 	fi
+	# The same checks install.sh ends with: a service that cannot run as festival stops here with
+	# the reason, instead of being reported as started and then failing to exec over and over.
+	if ! sh "$FP_ROOT/deploy/alpine/check.sh" "$FP_ROOT"; then
+		eerror "the install cannot run as festival: see the lines above"
+		return 1
+	fi
 	checkpath --directory --owner festival:festival --mode 0750 /var/log/festival-planner
 }

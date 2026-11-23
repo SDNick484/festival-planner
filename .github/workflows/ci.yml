@@ -132,7 +132,7 @@ jobs:
           docker exec fp-alpine sh -eu -c '
             apk add --no-cache shellcheck
             cd /opt/festival-planner
-            shellcheck -s sh deploy/alpine/install.sh scripts/backup.sh
+            shellcheck -s sh deploy/alpine/install.sh deploy/alpine/check.sh scripts/backup.sh
             shellcheck -s sh -e SC2034 deploy/alpine/festival-planner-web.initd \
               deploy/alpine/festival-planner-worker.initd
           '
@@ -143,6 +143,28 @@ jobs:
             cd /opt/festival-planner
             sh deploy/alpine/install.sh --with-cron
             sh deploy/alpine/install.sh --with-cron
+          '
+      - name: An install the service user cannot run fails with the reason
+        run: |
+          set -eu
+          docker exec fp-alpine sh -eu -c '
+            # A checkout under /root: festival cannot enter it, so install.sh must stop and say so.
+            mkdir -p /root/src
+            cp -a /opt/festival-planner /root/src/festival-planner
+            rm -rf /root/src/festival-planner/.venv
+            if sh /root/src/festival-planner/deploy/alpine/install.sh > /tmp/out 2>&1; then
+              cat /tmp/out; echo "install under /root should have failed"; exit 1
+            fi
+            cat /tmp/out
+            grep -q "cannot enter /root" /tmp/out
+            # Moving it to a reachable path: install.sh rebuilds the venv built at the old path.
+            mv /root/src/festival-planner /srv/fp-moved
+            sh /srv/fp-moved/deploy/alpine/install.sh > /tmp/out 2>&1 || { cat /tmp/out; exit 1; }
+            grep -q "built at another path: rebuilding" /tmp/out
+            head -n 1 /srv/fp-moved/.venv/bin/gunicorn | grep -q "^#!/srv/fp-moved/.venv/bin/"
+            rm -rf /srv/fp-moved
+            # The real install is still in place for the next step.
+            sh /opt/festival-planner/deploy/alpine/check.sh
           '
       - name: Serve with the OpenRC scripts and the example config, and check /healthz
         run: |

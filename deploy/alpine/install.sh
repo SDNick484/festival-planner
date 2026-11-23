@@ -109,6 +109,19 @@ install -d -m 750 -o root -g "$fp_user" "$config_dir"
 # --- the app's virtual environment --------------------------------------------------------------
 # System Python only (never download one: uv's managed builds are not what Alpine runs), locked
 # versions only, no dev tools. The files stay root-owned: the service user cannot change its code.
+# A virtualenv's scripts name their interpreter by absolute path, so one built elsewhere (a checkout
+# that was moved here) cannot start: it is rebuilt.
+# stale-venv-begin
+if [ -f "$root/.venv/bin/gunicorn" ]; then
+    case $(head -n 1 "$root/.venv/bin/gunicorn") in
+        "#!$root/.venv/bin/"*) ;;
+        *)
+            say "the virtualenv in $root/.venv was built at another path: rebuilding it"
+            rm -rf "$root/.venv"
+            ;;
+    esac
+fi
+# stale-venv-end
 say "installing locked dependencies into $root/.venv"
 (
     cd "$root"
@@ -145,6 +158,12 @@ if [ "$with_cron" = yes ]; then
     mv "/etc/crontabs/$fp_user.new" "/etc/crontabs/$fp_user"
 fi
 
+# --- check --------------------------------------------------------------------------------------
+# Fail now, with the reason, rather than leave a service that cannot start as the service user.
+say "checking that $fp_user can run the install"
+FP_USER=$fp_user sh "$here/check.sh" "$root" "$config_dir/config.toml" ||
+    die "the install cannot run as $fp_user: fix the problems above and rerun install.sh"
+
 # --- next steps ---------------------------------------------------------------------------------
 cat <<NEXT
 
@@ -163,7 +182,8 @@ cat <<NEXT
                  rc-update add festival-planner-worker default
                  rc-service festival-planner-web start
                  rc-service festival-planner-worker start
-  4. Check:      wget -qO- http://127.0.0.1:8000/healthz
+  4. Check:      sh $root/deploy/alpine/check.sh     (again after editing the settings)
+                 wget -qO- http://127.0.0.1:8000/healthz   (or the FP_WEB_BIND address)
 NEXT
 if [ "$with_cron" = yes ]; then
     echo "  5. Backups:    rc-update add crond default && rc-service crond start"
