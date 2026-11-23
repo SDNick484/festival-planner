@@ -521,3 +521,32 @@ def test_register_api_prefix_and_token_auth(cfg, keys):
         register_api(app, "/api", "web")  # the same prefix twice would clash
     with pytest.raises(ValueError):
         register_api(app, "/other", "basic")
+
+
+# --- what the UI's task screens rely on -----------------------------------------------------
+
+
+def test_task_responses_include_effective_due(api):
+    ws = make_ws(api)
+    stone = api.post("/api/milestones", {"name": "T-30", "days_before_event": 30}).json
+    own = make_task(api, ws, "Own date", due_date="2099-09-20", milestone_id=stone["id"])
+    derived = make_task(api, ws, "From milestone", milestone_id=stone["id"])
+    bare = make_task(api, ws, "No date")
+    assert own["effective_due"] == "2099-09-20"
+    assert derived["effective_due"] == "2099-09-10"  # the event date minus 30 days
+    assert bare["effective_due"] is None
+    assert api.get(f"/api/tasks/{derived['id']}").json["effective_due"] == "2099-09-10"
+    listed = {t["title"]: t["effective_due"] for t in api.get("/api/tasks").json}
+    assert listed == {"Own date": "2099-09-20", "From milestone": "2099-09-10", "No date": None}
+    updated = api.patch(f"/api/tasks/{bare['id']}", {"due_date": "2099-09-01"}).json
+    assert updated["effective_due"] == "2099-09-01"
+    # Moving the event date moves a milestone-only task with it.
+    api.put("/api/event", {"event_date": "2099-11-10"})
+    assert api.get(f"/api/tasks/{derived['id']}").json["effective_due"] == "2099-10-11"
+
+
+def test_organizers_lists_email_and_display_name_only(api):
+    r = api.get("/api/organizers")
+    assert r.status_code == 200
+    assert [o["email"] for o in r.json] == [ORGANIZER_A, ORGANIZER_B]
+    assert all(set(o) == {"email", "display_name"} for o in r.json)

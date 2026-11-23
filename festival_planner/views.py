@@ -77,6 +77,14 @@ def effective_due(task: dict, event_date: date, milestones: dict[int, int]) -> d
     return event_date - timedelta(days=days)
 
 
+def with_effective_due(con: sqlite3.Connection, cfg: Config, rows: list[dict]) -> list[dict]:
+    """The task dicts with `effective_due` (an ISO date or None) added, for the API and the UI.
+    The event date and milestones are read once for the whole list."""
+    ev_date = _event_date(con, cfg)
+    days = _milestone_days(con)
+    return [_item(t, effective_due(t, ev_date, days)) for t in rows]
+
+
 def _open_with_due(con: sqlite3.Connection, cfg: Config) -> list[tuple[dict, date | None]]:
     ev_date = _event_date(con, cfg)
     days = _milestone_days(con)

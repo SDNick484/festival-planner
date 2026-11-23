@@ -453,3 +453,325 @@ textarea {
   color: var(--accent-text);
   border-bottom-color: var(--danger);
 }
+
+/* --- #11 Workstream and Task --- */
+.view-workstream [hidden],
+.view-task [hidden] {
+  display: none !important;
+}
+
+.view-workstream,
+.view-task {
+  max-width: 720px;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.ws-list,
+.task-list,
+.contacts,
+.link-list,
+.activity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-section {
+  margin-top: calc(var(--gutter) * 1.5);
+}
+
+/* Workstream list: one tappable card per workstream. */
+.ws-card + .ws-card {
+  margin-top: 8px;
+}
+
+.ws-card a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 56px;
+  padding: 10px var(--gutter);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.ws-name {
+  font-weight: 600;
+}
+
+.ws-meta {
+  font-size: 0.875rem;
+}
+
+/* Task rows: status dot, title, an optional reason line and the due date and owner. */
+.task-row + .task-row {
+  border-top: 1px solid var(--border);
+}
+
+.task-row a {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.task-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.task-title {
+  font-weight: 500;
+}
+
+.task-note,
+.task-meta {
+  font-size: 0.875rem;
+}
+
+.task-note {
+  color: var(--muted);
+}
+
+.dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot.status-doing {
+  background: var(--accent);
+}
+
+.dot.status-waiting {
+  background: var(--warn);
+}
+
+.dot.status-blocked {
+  background: var(--danger);
+}
+
+.dot.status-done {
+  background: var(--ok);
+}
+
+.done-tasks {
+  margin-top: calc(var(--gutter) * 1.5);
+}
+
+.done-tasks summary {
+  min-height: 44px;
+  padding: 10px 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.contact-name {
+  font-weight: 600;
+}
+
+/* Inputs, buttons and chips share one look. 44px tall for a thumb. */
+.view-workstream input,
+.view-workstream button,
+.view-task input,
+.view-task select,
+.view-task textarea,
+.view-task button {
+  min-height: 44px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.view-workstream input,
+.view-task input,
+.view-task select,
+.view-task textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.btn {
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.btn-small {
+  min-height: 36px !important;
+  padding: 4px 10px !important;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+}
+
+.add-task {
+  margin-top: var(--gutter);
+}
+
+.add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-row button {
+  flex: none;
+}
+
+.field-error {
+  margin: 4px 0 0;
+  color: var(--danger);
+  font-size: 0.875rem;
+}
+
+.field-error:empty {
+  display: none;
+}
+
+/* Task screen */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--gutter);
+}
+
+.chip {
+  flex: 1 1 auto;
+  cursor: pointer;
+  border-radius: 999px !important;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.chip.status-waiting[aria-pressed="true"] {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+.chip.status-blocked[aria-pressed="true"] {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.chip.status-done[aria-pressed="true"] {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.blocked-prompt {
+  margin-bottom: var(--gutter);
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+}
+
+.blocked-prompt label,
+.field label,
+.field .label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.field {
+  margin-bottom: var(--gutter);
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+}
+
+.link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.link-add {
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.link-add input {
+  flex: 1 1 140px;
+  width: auto;
+}
+
+.task-section {
+  margin-top: calc(var(--gutter) * 1.5);
+}
+
+.activity-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.activity-item time,
+.activity-source,
+.activity-actor {
+  color: var(--muted);
+}
+
+.activity-item > :not(:last-child)::after {
+  content: " ·";
+}
+
+.activity-what {
+  flex-basis: 100%;
+}
+
+.activity-item > .activity-what::after {
+  content: none;
+}
