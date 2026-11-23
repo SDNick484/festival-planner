@@ -14,7 +14,15 @@ from typing import Any
 
 from festival_planner import clock
 from festival_planner.config import Config
-from festival_planner.service import NotFound, emails, event, milestones, tasks, workstreams
+from festival_planner.service import (
+    NotFound,
+    budget,
+    emails,
+    event,
+    milestones,
+    tasks,
+    workstreams,
+)
 from festival_planner.service._common import MAX_LIST_LIMIT
 
 WEEK_DAYS = 7
@@ -44,6 +52,7 @@ def _event_row(con: sqlite3.Connection, cfg: Config) -> dict:
             "event_date": cfg.event_date.isoformat(),
             "timezone": cfg.timezone.key,
             "goal_note": "",
+            "net_goal_cents": None,
         }
 
 
@@ -223,9 +232,12 @@ def countdown(cfg_or_event_date: Config | date, today: date) -> dict:
 
 
 def build_digest(con: sqlite3.Connection, cfg: Config) -> dict:
-    """Everything the home screen, `get_digest` and the weekly email show."""
+    """Everything the home screen, `get_digest` and the weekly email show.
+
+    `budget` (the budget summary plus the currency) is there only once the budget has items.
+    """
     ev = _event_row(con, cfg)
-    return {
+    digest = {
         "event": ev,
         "countdown": countdown(date.fromisoformat(ev["event_date"]), clock.today(cfg)),
         "needs_attention": needs_attention(con, cfg),
@@ -233,3 +245,6 @@ def build_digest(con: sqlite3.Connection, cfg: Config) -> dict:
         "inbox_count": emails.inbox_count(con),
         "workstreams": workstream_progress(con),
     }
+    if budget.count(con):
+        digest["budget"] = {**budget.summary(con), "currency": cfg.currency}
+    return digest

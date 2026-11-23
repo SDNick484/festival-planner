@@ -15,6 +15,7 @@ from flask import Blueprint, Flask
 
 from festival_planner.api import (
     activity,
+    budget,
     contacts,
     digest,
     event,
@@ -27,7 +28,7 @@ from festival_planner.api import (
 )
 from festival_planner.api._common import Router, install_errors
 
-MODULES = (event, workstreams, tasks, milestones, contacts, activity, digest, inbox)
+MODULES = (event, workstreams, tasks, milestones, contacts, activity, digest, inbox, budget)
 # Organizer-only: machine tokens never create or see share links or CSV exports.
 WEB_ONLY_MODULES = (share, export)
 _PREFIX_RE = re.compile(r"/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*")

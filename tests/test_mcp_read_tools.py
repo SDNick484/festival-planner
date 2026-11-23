@@ -32,6 +32,7 @@ READ_TOOLS = {
     "list_milestones",
     "list_contacts",
     "get_activity",
+    "get_budget",
 }
 
 

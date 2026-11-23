@@ -22,6 +22,7 @@ from festival_planner.service import (
     Actor,
     ValidationError,
     activity,
+    budget,
     contacts,
     emails,
     tasks,
@@ -326,6 +327,20 @@ def get_activity(
     return {"activity": rows}
 
 
+@tool(
+    "get_budget",
+    "read",
+    "The budget: the currency, a summary and every item. Amounts are integer cents (hundredths "
+    "of the currency unit). summary has revenue and cost totals per state (estimated, pledged, "
+    "received; a cost is shown as estimated, committed, paid), net_projected (all revenue minus "
+    "all cost), net_actual (revenue received minus cost paid), the net goal (null if unset) and "
+    "pct_of_goal (net_projected as a percent of the goal, null without a goal).",
+    _schema(),
+)
+def get_budget(con: sqlite3.Connection, cfg: Config, actor: Actor) -> dict:
+    return budget.overview(con, cfg.currency)
+
+
 # --- Write tools (Task 20) -----------------------------------------------------------------
 #
 # Every write tool is registered with scope "write" and goes through the service layer, the only
@@ -550,3 +565,40 @@ def upsert_contact(
     if id is None:
         return {"contact": contacts.create(con, actor, fields)}
     return {"contact": contacts.update(con, actor, id, fields)}
+
+
+_BUDGET_FIELDS: dict[str, Any] = {
+    "label": _text("What the line is, such as a vendor or a sponsor"),
+    "kind": {"type": "string", "enum": list(budget.KINDS)},
+    "amount_cents": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": budget.MAX_CENTS,
+        "description": "Whole cents, never a float: 12.50 is 1250",
+    },
+    "state": {
+        "type": "string",
+        "enum": list(budget.STATES),
+        "description": "estimated, pledged or received (for a cost: estimated, committed, paid)",
+    },
+    "workstream_id": {**_ID, "type": ["integer", "null"]},
+    "notes": {"type": "string", "maxLength": MAX_NOTES},
+}
+
+
+@tool(
+    "upsert_budget_item",
+    "write",
+    "Create a budget item (label, kind and amount_cents required; state defaults to estimated), "
+    "or with id change only the fields you pass (null clears workstream_id). Amounts are integer "
+    "cents. Moving an item to pledged or received is how a pledge or payment is recorded. The "
+    "net goal is set by a person in the web UI.",
+    _schema({"id": {**_ID, "description": "Budget item id, to update"}, **_BUDGET_FIELDS}),
+)
+def upsert_budget_item(
+    con: sqlite3.Connection, cfg: Config, actor: Actor, *, id: int | None = None, **fields: Any
+) -> dict:
+    _no_surrogates_deep(fields)
+    if id is None:
+        return {"item": budget.create(con, actor, fields)}
+    return {"item": budget.update(con, actor, id, fields)}

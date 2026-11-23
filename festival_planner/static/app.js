@@ -16,6 +16,7 @@ export const ROUTES = [
   { path: "/timeline", view: "timeline", ready: true, tab: "timeline", title: "Timeline" }, // #12
   { path: "/manage", view: "manage", ready: true, tab: "home", title: "Manage" }, // #12
   { path: "/inbox", view: "inbox", ready: true, tab: "inbox", title: "Inbox" }, // #16
+  { path: "/budget", view: "budget", ready: true, tab: "home", title: "Budget" }, // #22
 ];
 
 const TABS = [

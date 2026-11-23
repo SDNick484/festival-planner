@@ -29,6 +29,7 @@ WRITE_TOOLS = {
     "file_email",
     "dismiss_email",
     "upsert_contact",
+    "upsert_budget_item",
 }
 
 
@@ -121,6 +122,7 @@ def test_read_token_gets_write_tools_hidden_and_refused(client, con, ws):
         "file_email": {"email_id": 1, "task_id": 1},
         "dismiss_email": {"email_id": 1},
         "upsert_contact": {"name": "Nope"},
+        "upsert_budget_item": {"label": "Nope", "kind": "cost", "amount_cents": 1},
     }
     assert calls.keys() == WRITE_TOOLS
     for name, arguments in calls.items():

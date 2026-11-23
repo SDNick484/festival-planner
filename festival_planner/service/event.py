@@ -17,7 +17,9 @@ from festival_planner.service._common import (
 )
 
 TABLE = "event"
-FIELDS = ("name", "event_date", "timezone", "goal_note")
+FIELDS = ("name", "event_date", "timezone", "goal_note", "net_goal_cents")
+# Integer cents; a goal is never negative. Kept in step with the budget items' own cap.
+MAX_GOAL_CENTS = 10**12
 
 
 def _validate(data: Any, partial: bool) -> dict[str, Any]:
@@ -32,6 +34,13 @@ def _validate(data: Any, partial: bool) -> dict[str, Any]:
         except (ZoneInfoNotFoundError, ValueError, OSError):
             c.fail("timezone", "must be an IANA time zone such as Europe/Berlin")
     c.notes("goal_note")
+    c.integer(
+        "net_goal_cents",
+        lo=0,
+        hi=MAX_GOAL_CENTS,
+        nullable=True,
+        label="a whole number of cents (integer, not a float)",
+    )
     return c.done()
 
 
@@ -54,13 +63,15 @@ def create(con: sqlite3.Connection, actor: Actor, data: dict) -> dict:
             raise ValidationError({"event": "already exists"})
         ts = now_iso()
         con.execute(
-            "INSERT INTO event (id, name, event_date, timezone, goal_note, created_at, updated_at)"
-            " VALUES (1, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO event"
+            " (id, name, event_date, timezone, goal_note, net_goal_cents, created_at, updated_at)"
+            " VALUES (1, ?, ?, ?, ?, ?, ?, ?)",
             (
                 values["name"],
                 values["event_date"],
                 values["timezone"],
                 values.get("goal_note", ""),
+                values.get("net_goal_cents"),
                 ts,
                 ts,
             ),

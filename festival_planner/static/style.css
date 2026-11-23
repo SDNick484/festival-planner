@@ -1536,3 +1536,126 @@ summary.tl-head::-webkit-details-marker {
   align-items: center;
   text-decoration: none;
 }
+
+/* --- #22 Budget --- */
+.home-links {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.bg-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gutter);
+}
+
+.bg-summary {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 var(--gutter);
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.bg-figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--gutter);
+}
+
+.bg-figure {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bg-caption {
+  font-size: 0.8125rem;
+}
+
+.bg-big {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.bg-bar {
+  width: 100%;
+  height: 12px;
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.bg-bar::-webkit-progress-bar {
+  background: var(--border);
+}
+
+.bg-bar::-webkit-progress-value {
+  background: var(--accent);
+}
+
+.bg-bar::-moz-progress-bar {
+  background: var(--accent);
+}
+
+.bg-pct {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.bg-totals {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.bg-total {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
+.bg-total-kind {
+  min-width: 5em;
+  font-weight: 600;
+}
+
+.bg-goal,
+.bg-group,
+.bg-add-section {
+  margin: 0 0 var(--gutter);
+}
+
+.bg-item > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.bg-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bg-state {
+  flex: none;
+  font-size: 0.8125rem;
+}
+
+.bg-amount {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+@media (min-width: 600px) {
+  .bg-figures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

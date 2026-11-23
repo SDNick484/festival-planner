@@ -74,7 +74,8 @@ def update(
 
 
 def delete(con: sqlite3.Connection, actor: Actor, workstream_id: int) -> None:
-    """Soft delete. Refused while live tasks remain: move or delete them first (or archive)."""
+    """Soft delete. Refused while live tasks or budget items remain: move or delete them first
+    (or archive)."""
     with transaction(con):
         before = fetch_live(con, TABLE, workstream_id)
         count = con.execute(
@@ -83,6 +84,12 @@ def delete(con: sqlite3.Connection, actor: Actor, workstream_id: int) -> None:
         ).fetchone()[0]
         if count:
             raise ValidationError({"tasks": f"workstream still has {count} task(s)"})
+        items = con.execute(
+            "SELECT count(*) FROM budget_item WHERE workstream_id = ? AND deleted_at IS NULL",
+            (workstream_id,),
+        ).fetchone()[0]
+        if items:
+            raise ValidationError({"budget": f"workstream still has {items} budget item(s)"})
         soft_delete(con, actor, TABLE, before)
 
 
