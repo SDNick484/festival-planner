@@ -1,0 +1,178 @@
+/* Mobile first, 16px gutter. Colors are variables; the dark scheme only redefines them. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --text: #1b2224;
+  --muted: #5b676b;
+  --border: #d9dfdc;
+  --accent: #1f6f5c;
+  --accent-text: #ffffff;
+  --danger: #c0392b;
+  --warn: #b7791f;
+  --ok: #2f855a;
+  --gutter: 16px;
+  --tabbar-h: 56px;
+  --radius: 10px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181a;
+    --surface: #1d2326;
+    --text: #e8edea;
+    --muted: #9aa8ab;
+    --border: #2e383c;
+    --accent: #4fb596;
+    --accent-text: #0e1a16;
+    --danger: #ef7b6e;
+    --warn: #e0a84a;
+    --ok: #5cc18a;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+#view {
+  display: block;
+  min-height: 100vh;
+  padding: var(--gutter) var(--gutter) calc(var(--tabbar-h) + var(--gutter) + env(safe-area-inset-bottom));
+}
+
+.view {
+  min-width: 0;
+}
+
+/* The router focuses the new screen for assistive tech; it is not interactive, so no ring. */
+.view:focus,
+#view:focus {
+  outline: none;
+}
+
+h1 {
+  margin: 0 0 var(--gutter);
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Long user text (a 500-character title) wraps or truncates instead of widening the page. */
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+.truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Bottom tab bar */
+.tabbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.tabbar a {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--tabbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  text-decoration: none;
+}
+
+.tabbar a[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
+/* Home: one column on a phone, two from 900px. Direct children flow into the grid; give a child
+   `.span-all` to run it across both columns (the header). */
+.view-home {
+  display: block;
+}
+
+.span-all {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 900px) {
+  #view {
+    padding-right: calc(var(--gutter) * 2);
+    padding-left: calc(var(--gutter) * 2);
+  }
+
+  .view-home {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--gutter) calc(var(--gutter) * 2);
+    align-content: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

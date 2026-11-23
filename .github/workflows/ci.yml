@@ -25,7 +25,18 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
-      - run: uv run --python ${{ matrix.python-version }} pytest -q
+      # The browser tests run in the `ui` job, which installs Chromium.
+      - run: uv run --python ${{ matrix.python-version }} pytest -q --ignore=tests/ui
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      - run: uv run playwright install --with-deps chromium
+      - run: uv run pytest tests/ui -q
 
   leak-check:
     runs-on: ubuntu-latest

@@ -1,10 +1,14 @@
-.PHONY: dev test lint format check leak-check seed-demo hooks
+.PHONY: dev test ui-test lint format check leak-check seed-demo hooks
 
 dev:
 	FLASK_ENV=development uv run flask --app festival_planner.web:create_app run --debug
 
 test:
 	uv run pytest -q
+
+# Browser tests only. First time: uv run playwright install chromium
+ui-test:
+	uv run pytest tests/ui -q
 
 lint:
 	uv run ruff check .
