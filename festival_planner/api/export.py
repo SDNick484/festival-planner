@@ -8,7 +8,7 @@ Web auth only (`WEB_ONLY_MODULES`), so machine tokens get a 404 on `/mcp/api/exp
   the fields it changed, never their values, because values can carry email text (a captured
   email's subject, a task titled from an email subject, a forward note). Rows about email items
   are left out, and a `file_email` row's note (the forward note) is blanked.
-* budget: Task 22 adds it. Until then it is an unknown kind and answers 404.
+* budget: the live items, amounts as integer cents (the currency is in `GET /api/budget`).
 
 CSV injection: a text cell that starts with `= + - @`, a tab or a carriage return gets a single
 quote in front, so a spreadsheet shows it as text rather than running it as a formula.
@@ -27,7 +27,7 @@ from flask import Response, abort
 from festival_planner import views
 from festival_planner.api._common import Router, config
 from festival_planner.db import get_db
-from festival_planner.service import contacts, tasks
+from festival_planner.service import budget, contacts, tasks
 
 PAGE = 500  # the service lists' own maximum page size
 FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -58,6 +58,17 @@ CONTACT_COLUMNS = (
     "role",
     "emails",
     "phone",
+    "notes",
+    "created_at",
+    "updated_at",
+)
+BUDGET_COLUMNS = (
+    "id",
+    "workstream_id",
+    "label",
+    "kind",
+    "amount_cents",
+    "state",
     "notes",
     "created_at",
     "updated_at",
@@ -107,6 +118,11 @@ def _contact_rows() -> Iterator[dict]:
             yield row
 
 
+def _budget_rows() -> Iterator[dict]:
+    for batch in _pages(budget.list, get_db()):
+        yield from batch
+
+
 def _activity_rows() -> Iterator[dict]:
     # Keyset paging on id: the activity log has no offset in the service layer.
     con = get_db()
@@ -136,6 +152,7 @@ SOURCES: dict[str, tuple[tuple[str, ...], Callable[[], Iterator[dict]]]] = {
     "tasks": (TASK_COLUMNS, _task_rows),
     "contacts": (CONTACT_COLUMNS, _contact_rows),
     "activity": (ACTIVITY_COLUMNS, _activity_rows),
+    "budget": (BUDGET_COLUMNS, _budget_rows),
 }
 
 

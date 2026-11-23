@@ -26,6 +26,7 @@ RESERVED_TOKEN_NAMES = frozenset({"web", "email", "system"})
 
 _TOKEN_NAME_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 _EMAIL_RE = re.compile(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+")
+_CURRENCY_RE = re.compile(r"[A-Za-z]{3}")
 _HOST_RE = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?")
 
 
@@ -78,6 +79,7 @@ class Config:
     digest_hour: int = 8
     digest_final_stretch: bool = False
     base_url: str | None = None  # the instance's public address, for links in the digest email
+    currency: str = "USD"  # ISO 4217 code the budget is shown in (amounts are stored as cents)
 
     def __repr__(self) -> str:
         return "Config(<redacted>)"
@@ -164,6 +166,16 @@ def _base_url(value: str | None, where: str) -> str | None:
             f"{where} must be an http(s) URL such as https://host (no login, query or #)"
         )
     return value.rstrip("/")
+
+
+def _currency(table: Mapping[str, Any], where: str) -> str:
+    """A three-letter currency code such as USD, kept upper-case. USD when not set."""
+    value = _str(table, "currency", where)
+    if value is None:
+        return "USD"
+    if not _CURRENCY_RE.fullmatch(value):
+        raise ConfigError(f"{where}.currency must be a three-letter currency code such as USD")
+    return value.upper()
 
 
 def _email(value: object, where: str) -> str:
@@ -289,7 +301,10 @@ def load_config(path: Path | None = None, env: Mapping[str, str] = os.environ) -
     )
 
     event = _table(
-        data, "event", {"name", "date", "timezone", "data_dir", "base_url"}, required=True
+        data,
+        "event",
+        {"name", "date", "timezone", "data_dir", "base_url", "currency"},
+        required=True,
     )
     event_name = _str(event, "name", "event", required=True)
     event_date = event.get("date")
@@ -302,6 +317,7 @@ def load_config(path: Path | None = None, env: Mapping[str, str] = os.environ) -
         raise ConfigError(f"event.timezone is not a known IANA time zone: {tz_name}") from None
     data_dir = Path(_str(event, "data_dir", "event") or "data")
     base_url = _base_url(_str(event, "base_url", "event"), "event.base_url")
+    currency = _currency(event, "event")
 
     organizers = _parse_organizers(data)
     seed_workstreams, seed_milestones = _parse_seed(data)
@@ -372,4 +388,5 @@ def load_config(path: Path | None = None, env: Mapping[str, str] = os.environ) -
         digest_hour=cast(int, _int(digest, "hour", "digest", 8, 0, 23)),
         digest_final_stretch=_bool(digest, "final_stretch", "digest", False),
         base_url=base_url,
+        currency=currency,
     )

@@ -4,6 +4,7 @@ Web auth only: `/api/export/<kind>.csv` is mounted under `/api` alone, so a mach
 404 on `/mcp/api/export/*`. Every text cell that starts with `= + - @`, a tab or a carriage return
 gets a single quote in front, so a spreadsheet shows it as text. Activity rows carry the names of
 the fields they changed, never their values, and never an email's subject, body or forward note.
+The budget export is covered in `test_budget`.
 """
 
 from __future__ import annotations
@@ -207,7 +208,7 @@ def test_csv_injection_leaves_other_cells_alone(api):
 
 
 def test_export_requires_auth(app, public):
-    for kind in ("tasks", "contacts", "activity"):
+    for kind in ("tasks", "contacts", "activity", "budget"):
         assert public.get(f"/api/export/{kind}.csv").status_code == 403
         bearer = {"Authorization": f"Bearer {WRITE_SECRET}"}
         assert public.get(f"/api/export/{kind}.csv", headers=bearer).status_code == 401
@@ -222,8 +223,7 @@ def test_export_requires_auth(app, public):
 
 
 def test_unknown_kind_is_404(api):
-    # Budget is not here yet: Task 22 adds it. Until then it is an unknown kind.
-    for kind in ("budget", "nope", "tasks.csv"):
+    for kind in ("nope", "tasks.csv", "budgets"):
         r = api.call("GET", f"/api/export/{kind}.csv")
         assert r.status_code == 404, kind
         assert r.json == {"error": "not found", "fields": {}}

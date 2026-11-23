@@ -8,6 +8,7 @@ date = 2099-10-10          # local date of the event
 timezone = "UTC"           # IANA name, e.g. "Europe/Berlin"; "today" is computed in this zone
 data_dir = "data"          # SQLite database and other runtime files (relative to the working directory)
 base_url = "https://festival.example.com"  # public address of this app; digest email links start with it
+currency = "USD"           # three-letter code the budget is shown in (amounts are stored as whole cents)
 
 # Exactly the people who may log in. Aliases are other addresses each person sends or forwards
 # from; they are used to recognise senders, never for login.

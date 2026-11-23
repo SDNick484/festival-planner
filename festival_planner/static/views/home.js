@@ -37,7 +37,12 @@ function header(digest, overall) {
   return h(
     "header",
     { class: "home-header span-all", "data-section": "header" },
-    h("div", { class: "home-top" }, h("h1", null, "Home"), h("a", { class: "manage-link", href: "#/manage" }, "Manage")),
+    h(
+      "div",
+      { class: "home-top" },
+      h("h1", null, "Home"),
+      h("span", { class: "home-links" }, h("a", { class: "manage-link", href: "#/budget" }, "Budget"), h("a", { class: "manage-link", href: "#/manage" }, "Manage")),
+    ),
     h(
       "div",
       { class: "home-stats" },
