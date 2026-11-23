@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 from flask import Flask, jsonify
 
+from festival_planner import db
+
 if TYPE_CHECKING:
     from festival_planner.config import Config
 
@@ -17,6 +19,7 @@ def create_app(config: Config | None = None) -> Flask:
     """
     app = Flask(__name__)
     app.config["FP"] = config
+    db.init_app(app)
 
     @app.get("/healthz")
     def healthz():
