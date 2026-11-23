@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from flask import Flask, Response, jsonify
 
 from festival_planner import auth, db, seed
+from festival_planner.api import register_api
 
 if TYPE_CHECKING:
     from festival_planner.config import Config
@@ -43,5 +44,7 @@ def create_app(config: Config | None = None) -> Flask:
     @app.get("/healthz")
     def healthz():
         return jsonify(ok=True)
+
+    register_api(app)
 
     return app
