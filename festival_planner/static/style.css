@@ -1529,3 +1529,10 @@ summary.tl-head::-webkit-details-marker {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.875rem;
 }
+
+/* --- #25 Export --- */
+.mg-export {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}

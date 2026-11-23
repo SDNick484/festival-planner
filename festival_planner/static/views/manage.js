@@ -562,6 +562,29 @@ async function shareLinksSection() {
   });
 }
 
+// --- export (#25) ------------------------------------------------------------------------
+
+// Each link is a plain download from the API: the server names the file and sends
+// Cache-Control: no-store. Nothing is fetched or scripted here.
+const EXPORTS = [
+  ["tasks", "Tasks"],
+  ["contacts", "Contacts"],
+  ["activity", "Activity log"],
+];
+
+async function exportSection() {
+  return built("export", "Export", () => [
+    h("p", { class: "muted" }, "Download a CSV file. Email bodies are never included."),
+    h(
+      "ul",
+      { class: "mg-list" },
+      EXPORTS.map(([kind, label]) =>
+        h("li", null, h("a", { class: "mg-btn mg-export", href: `/api/export/${kind}.csv`, download: true }, `${label} (CSV)`)),
+      ),
+    ),
+  ]);
+}
+
 // --- the screen ----------------------------------------------------------------------------
 
 // One builder per section, one per line, in the order they appear. Each builder returns its
@@ -573,6 +596,7 @@ const SECTIONS = [
   milestonesSection,
   contactsSection,
   shareLinksSection,
+  exportSection,
   // --- add new sections above this line (#24 Share links, #25 Export) ---
 ];
 

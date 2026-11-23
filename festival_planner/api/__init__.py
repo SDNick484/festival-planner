@@ -18,6 +18,7 @@ from festival_planner.api import (
     contacts,
     digest,
     event,
+    export,
     inbox,
     milestones,
     share,
@@ -27,8 +28,8 @@ from festival_planner.api import (
 from festival_planner.api._common import Router, install_errors
 
 MODULES = (event, workstreams, tasks, milestones, contacts, activity, digest, inbox)
-# Organizer-only: machine tokens never create or see share links.
-WEB_ONLY_MODULES = (share,)
+# Organizer-only: machine tokens never create or see share links or CSV exports.
+WEB_ONLY_MODULES = (share, export)
 _PREFIX_RE = re.compile(r"/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*")
 
 
