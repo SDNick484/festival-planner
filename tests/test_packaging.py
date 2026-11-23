@@ -71,9 +71,9 @@ def test_compose_example_has_no_secrets():
     for line in re.finditer(r"TUNNEL_TOKEN\s*[=:]\s*(\S+)", text):
         value = line.group(1).strip("\"'")
         assert value.startswith("<") or value.startswith("${"), value
-    # The worker stays commented out until the worker module exists (Task 15).
-    assert not re.search(r"^\s{2}worker:", body, flags=re.M)
-    assert "festival_planner.worker" in text
+    # The worker service is live (Task 15) and runs the worker module from the same image.
+    assert re.search(r"^\s{2}worker:", body, flags=re.M)
+    assert '"-m", "festival_planner.worker"' in body
 
 
 def test_deploy_doc_mentions_mcp_bypass():

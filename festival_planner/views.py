@@ -14,7 +14,7 @@ from typing import Any
 
 from festival_planner import clock
 from festival_planner.config import Config
-from festival_planner.service import NotFound, event, milestones, tasks, workstreams
+from festival_planner.service import NotFound, emails, event, milestones, tasks, workstreams
 from festival_planner.service._common import MAX_LIST_LIMIT
 
 WEEK_DAYS = 7
@@ -222,6 +222,6 @@ def build_digest(con: sqlite3.Connection, cfg: Config) -> dict:
         "countdown": countdown(date.fromisoformat(ev["event_date"]), clock.today(cfg)),
         "needs_attention": needs_attention(con, cfg),
         "due_this_week": due_this_week(con, cfg),
-        "inbox_count": 0,  # filled in by the email capture task
+        "inbox_count": emails.inbox_count(con),
         "workstreams": workstream_progress(con),
     }
