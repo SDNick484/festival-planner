@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from flask import Flask, jsonify
+from flask import Flask, Response, jsonify
 
-from festival_planner import db
+from festival_planner import auth, db
 
 if TYPE_CHECKING:
     from festival_planner.config import Config
+
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+}
 
 
 def create_app(config: Config | None = None) -> Flask:
@@ -20,6 +29,12 @@ def create_app(config: Config | None = None) -> Flask:
     app = Flask(__name__)
     app.config["FP"] = config
     db.init_app(app)
+    auth.init_app(app)
+
+    @app.after_request
+    def security_headers(response: Response) -> Response:
+        response.headers.update(SECURITY_HEADERS)
+        return response
 
     @app.get("/healthz")
     def healthz():
