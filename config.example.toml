@@ -7,6 +7,7 @@ name = "Example Fall Festival"
 date = 2099-10-10          # local date of the event
 timezone = "UTC"           # IANA name, e.g. "Europe/Berlin"; "today" is computed in this zone
 data_dir = "data"          # SQLite database and other runtime files (relative to the working directory)
+base_url = "https://festival.example.com"  # public address of this app; digest email links start with it
 
 # Exactly the people who may log in. Aliases are other addresses each person sends or forwards
 # from; they are used to recognise senders, never for login.
@@ -54,7 +55,7 @@ imap_label = "Festival"
 poll_seconds = 300
 retention_days = 30
 smtp_host = "smtp.example.com"
-smtp_port = 587
+smtp_port = 465           # implicit TLS (SMTP over SSL), which the digest email uses
 
 [digest]
 # Weekly digest email; leave weekday out to turn it off. 0 = Monday ... 6 = Sunday.

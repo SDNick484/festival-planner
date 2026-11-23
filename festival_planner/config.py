@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal, cast
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DEFAULT_CONFIG_PATH = "config.toml"
@@ -76,6 +77,7 @@ class Config:
     digest_weekday: int | None = None
     digest_hour: int = 8
     digest_final_stretch: bool = False
+    base_url: str | None = None  # the instance's public address, for links in the digest email
 
     def __repr__(self) -> str:
         return "Config(<redacted>)"
@@ -140,6 +142,28 @@ def _host(value: str | None, where: str) -> str | None:
     if value is not None and not _HOST_RE.fullmatch(value):
         raise ConfigError(f"{where} must be a bare host name (no scheme, port or path)")
     return value
+
+
+def _base_url(value: str | None, where: str) -> str | None:
+    """An http(s) URL with a host and nothing after the path; trailing slashes are dropped."""
+    if value is None:
+        return None
+    try:
+        parts = urlsplit(value)
+        _ = parts.port  # raises ValueError for a bad port
+    except ValueError:
+        raise ConfigError(f"{where} must be an http(s) URL such as https://host") from None
+    ok = (
+        parts.scheme in ("http", "https")
+        and parts.hostname
+        and not (parts.username or parts.password or parts.query or parts.fragment)
+        and not any(c.isspace() or c in '\\<>"' for c in value)
+    )
+    if not ok:
+        raise ConfigError(
+            f"{where} must be an http(s) URL such as https://host (no login, query or #)"
+        )
+    return value.rstrip("/")
 
 
 def _email(value: object, where: str) -> str:
@@ -264,7 +288,9 @@ def load_config(path: Path | None = None, env: Mapping[str, str] = os.environ) -
         data, {"event", "organizers", "seed", "needs_attention", "email", "digest"}, "config"
     )
 
-    event = _table(data, "event", {"name", "date", "timezone", "data_dir"}, required=True)
+    event = _table(
+        data, "event", {"name", "date", "timezone", "data_dir", "base_url"}, required=True
+    )
     event_name = _str(event, "name", "event", required=True)
     event_date = event.get("date")
     if type(event_date) is not date:  # a TOML local date, not a datetime or a string
@@ -275,6 +301,7 @@ def load_config(path: Path | None = None, env: Mapping[str, str] = os.environ) -
     except (ZoneInfoNotFoundError, ValueError, OSError):
         raise ConfigError(f"event.timezone is not a known IANA time zone: {tz_name}") from None
     data_dir = Path(_str(event, "data_dir", "event") or "data")
+    base_url = _base_url(_str(event, "base_url", "event"), "event.base_url")
 
     organizers = _parse_organizers(data)
     seed_workstreams, seed_milestones = _parse_seed(data)
@@ -344,4 +371,5 @@ def load_config(path: Path | None = None, env: Mapping[str, str] = os.environ) -
         digest_weekday=_int(digest, "weekday", "digest", None, 0, 6),
         digest_hour=cast(int, _int(digest, "hour", "digest", 8, 0, 23)),
         digest_final_stretch=_bool(digest, "final_stretch", "digest", False),
+        base_url=base_url,
     )

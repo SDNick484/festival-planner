@@ -62,6 +62,13 @@ def test_loads_example_config():
     assert cfg.mcp_tokens == () and cfg.dev_auth_email is None
 
 
+def test_base_url_from_toml(tmp_path):
+    assert load_config(EXAMPLE, env={}).base_url == "https://festival.example.com"
+    body = minimal(event_extra='base_url = "https://festival.example.com/planner/"')
+    cfg = load_config(write_config(tmp_path, body), env={})
+    assert cfg.base_url == "https://festival.example.com/planner"  # no trailing slash
+
+
 def test_config_is_frozen():
     cfg = load_config(EXAMPLE, env={})
     with pytest.raises(AttributeError):
@@ -75,6 +82,7 @@ def test_defaults_when_sections_omitted(tmp_path):
     assert cfg.email_poll_seconds == 300 and cfg.email_retention_days == 30
     assert cfg.digest_weekday is None and cfg.digest_hour == 8 and cfg.digest_final_stretch is False
     assert cfg.imap_host is None and cfg.smtp_host is None and cfg.smtp_port is None
+    assert cfg.base_url is None
     assert cfg.seed_workstreams == () and cfg.seed_milestones == ()
     assert cfg.data_dir == Path("data")
 
@@ -240,6 +248,25 @@ def test_unknown_keys_rejected(tmp_path):
 def test_out_of_range_values_rejected(tmp_path, extra):
     with pytest.raises(ConfigError):
         load_config(write_config(tmp_path, minimal() + "\n" + extra), env={})
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "festival.example.com",  # needs a scheme
+        "ftp://festival.example.com",
+        "https://user:pw@example.com",
+        "https://festival.example.com/?a=1",
+        "https://festival.example.com/#x",
+        "https://festival .example.com",
+        "https://",
+        "",
+    ],
+)
+def test_bad_base_url_rejected(tmp_path, value):
+    body = minimal(event_extra=f'base_url = "{value}"')
+    with pytest.raises(ConfigError, match="base_url"):
+        load_config(write_config(tmp_path, body), env={})
 
 
 def test_missing_and_malformed_file(tmp_path):

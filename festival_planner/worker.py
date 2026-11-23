@@ -218,7 +218,7 @@ def main(
 # Each reserved line below is replaced by its task's registration.
 register_daily("festival_planner.service.emails:purge_bodies")
 
-# Task 21 (weekly digest): register_daily("festival_planner.mail.digest:<daily entry point>")
+register_daily("festival_planner.mail.digest:daily_digest")
 
 
 if __name__ == "__main__":
